@@ -46,12 +46,12 @@
 	},
 	"completeness":{
 		"Product":[
-			"select \"PrimaryMarket\", array_agg(distinct \"ProductName\") from \"Product\" group by \"PrimaryMarket\";",
+			"select \"PrimaryMarket\", array_agg(distinct \"BrandName\") from \"Product\" group by \"PrimaryMarket\";",
 			"select itpcd.\"ProductName\" from \"InsTrtyProductCycleData\" itpcd left join \"Product\" p on itpcd.\"ProductID\" = p.\"ProductID\" where p.\"ProductID\" is null;"
 		],
 		"ProductMapping":[
 			"select \"Market\", array_agg(distinct \"ProductName\") from \"ProductMapping\" group by \"Market\";",
-			"select itpcd.\"ProductName\" from \"InsTrtyProductCycleData\" itpcd left join \"ProductMapping\" pm on itpcd.\"ProductID\" = pm.\"ProductID\" where pm.\"ProductID\" is null;"
+			"select distinct itpcd.\"ProductName\" from \"InsTrtyProductCycleData\" itpcd left join \"ProductMapping\" pm on itpcd.\"ProductID\" = pm.\"ProductID\" where pm.\"ProductID\" is null;"
 		],
 		"OrgCycle":[
 			"select max(\"Cycle\"), array_agg(distinct \"Cycle\") from \"OrgCycle\" oc;",
@@ -83,7 +83,7 @@
 			"select count(*) from \"instrtyproductcycledata_raw\";",
 			"select sum(\"TargetValue\"), sum(\"SalesValue\"), sum(\"LYSalesValue\"), sum(\"SalesUnit\"), sum(\"LYSalesUnit\") from \"InsTrtyProductCycleData\";",
 			"select sum(targetvalue), sum(salesvalue), sum(lysalesvalue), sum(salesunit), sum(salesunit) from \"instrtyproductcycledata_raw\";",
-			"select itpcd.\"ProductID\", itpcd.\"ProductName\", itpcd.\"ProductName_EN\", p.\"PrimaryMarket\", array_agg(distinct \"Cycle\")  from \"InsTrtyProductCycleData\" itpcd\njoin \"Product\" p on itpcd.\"ProductID\" = p.\"ProductID\"\ngroup by itpcd.\"ProductID\", itpcd.\"ProductName\", itpcd.\"ProductName_EN\", p.\"PrimaryMarket\";"
+			"select p.\"BrandName\", p.\"BrandName_EN\", p.\"PrimaryMarket\", array_agg(distinct \"Cycle\")  from \"InsTrtyProductCycleData\" itpcd\njoin \"Product\" p on itpcd.\"ProductID\" = p.\"ProductID\"\ngroup by 1,2,3;"
 		],
 		"InsTrtyProductChannelCycleData":[
 			"select distinct \"Cycle\" from \"InsTrtyProductChannelCycleData\";",
