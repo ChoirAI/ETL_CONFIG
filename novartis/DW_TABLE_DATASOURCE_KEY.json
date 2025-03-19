@@ -1,0 +1,48 @@
+[
+  {
+    "name": "sales",
+    "priority": 1,
+    "tables": [
+      "Product",
+      "ProductMapping",
+      "Geography",
+      "Institution",
+      "OrgCycle",
+      "InsProdProperty",
+      "InsTrtyProductCycleData",
+      "InsTrtyProductChannelCycleData"
+    ]
+  },
+  {
+    "name": "ims",
+    "priority": 2,
+    "tables": [
+      "Geography",
+      "ProductMapping",
+      "TerritoryAreaMapping",
+      "MarketAreaMapping",
+      "AreaMarketCycleData"
+    ]
+  },
+  {
+    "name": "cpn",
+    "priority": 3,
+    "tables": [
+      "InsMarketCycleData"
+    ]
+  },
+  {
+    "name": "hospital listing",
+    "priority": 4,
+    "tables": [
+      "InsProdListing"
+    ]
+  },
+  {
+    "name": "low performance",
+    "priority": 5,
+    "tables": [
+      "LowPerformance"
+    ]
+  }
+]

@@ -1,0 +1,50 @@
+{
+  "raw_table_check": {
+    "dim_geo": [
+      "select count(*) as total_count from \"dim_geo_raw\";"
+    ],
+    "dim_product": [
+      "select count(*) as total_count from \"dim_product_raw\";"
+    ],
+    "fact_propel_sales_external": [
+      "select count(*) as total_count from \"fact_propel_sales_external_raw\";"
+    ],
+    "fact_iqvia_mth_gmd_ms": [
+      "select count(*) as total_count from \"fact_iqvia_mth_gmd_ms_raw\";"
+    ],
+    "fact_iqvia_qtr_gmd_ms": [
+      "select count(*) as total_count from \"fact_iqvia_qtr_gmd_ms_raw\";"
+    ],
+    "fact_iqvia_qtr_corp_rnk": [
+      "select count(*) as total_count from \"fact_iqvia_qtr_corp_rnk_raw\";"
+    ],
+    "fact_ireal_mainlist": [
+      "select count(*) as total_count from \"fact_ireal_mainlist_raw\";"
+    ]
+  },
+  "completeness": {
+    "dim_geo": [
+      "-- 对照新老geo表，查看数据量\nselect 'dim_geo' as \"table\" ,count(*) from dim_geo dg \nunion \nselect 'dim_geo_arc' as \"table\" ,count(*) from dim_geo_arc dg;",
+      "-- 对照新老geo表，查看各level数据量\nWITH geo_unique_counts AS (\n    SELECT\n        'geo_lvl1' AS level,\n        COUNT(DISTINCT geo_lvl1) AS new_counts\n    FROM public.dim_geo\n    UNION ALL\n    SELECT\n        'geo_lvl2',\n        COUNT(DISTINCT geo_lvl2)\n    FROM public.dim_geo\n    UNION ALL\n    SELECT\n        'geo_lvl3',\n        COUNT(DISTINCT geo_lvl3)\n    FROM public.dim_geo\n    UNION ALL\n    SELECT\n        'geo_lvl4',\n        COUNT(DISTINCT geo_lvl4)\n    FROM public.dim_geo\n    UNION ALL\n    SELECT\n        'geo_lvl5',\n        COUNT(DISTINCT geo_lvl5)\n    FROM public.dim_geo\n    UNION ALL\n    SELECT\n        'geo_lvl6',\n        COUNT(DISTINCT geo_lvl6)\n    FROM public.dim_geo\n    UNION ALL\n    SELECT\n        'geo_lvl7',\n        COUNT(DISTINCT geo_lvl7)\n    FROM public.dim_geo\n    UNION ALL\n    SELECT\n        'geo_lvl8',\n        COUNT(DISTINCT geo_lvl8)\n    FROM public.dim_geo\n),\ngeo_arc_unique_counts AS (\n    SELECT\n        'geo_lvl1' AS level,\n        COUNT(DISTINCT geo_lvl1) AS arc_counts\n    FROM public.dim_geo_arc\n    UNION ALL\n    SELECT\n        'geo_lvl2',\n        COUNT(DISTINCT geo_lvl2)\n    FROM public.dim_geo_arc\n    UNION ALL\n    SELECT\n        'geo_lvl3',\n        COUNT(DISTINCT geo_lvl3)\n    FROM public.dim_geo_arc\n    UNION ALL\n    SELECT\n        'geo_lvl4',\n        COUNT(DISTINCT geo_lvl4)\n    FROM public.dim_geo_arc\n    UNION ALL\n    SELECT\n        'geo_lvl5',\n        COUNT(DISTINCT geo_lvl5)\n    FROM public.dim_geo_arc\n    UNION ALL\n    SELECT\n        'geo_lvl6',\n        COUNT(DISTINCT geo_lvl6)\n    FROM public.dim_geo_arc\n    UNION ALL\n    SELECT\n        'geo_lvl7',\n        COUNT(DISTINCT geo_lvl7)\n    FROM public.dim_geo_arc\n    UNION ALL\n    SELECT\n        'geo_lvl8',\n        COUNT(DISTINCT geo_lvl8)\n    FROM public.dim_geo_arc\n)\nSELECT\n    g.level,\n    g.new_counts,\n    a.arc_counts\nFROM geo_unique_counts g\nJOIN geo_arc_unique_counts a ON g.level = a.level;"
+    ],
+    "dim_product": [
+      "-- 对照新老product表，查看数据量\nselect 'dim_product' as \"table\" ,count(*) from dim_product dg \nunion \nselect 'dim_product_arc' as \"table\" ,count(*) from dim_product_arc dg;",
+      "-- 对照新老product表，查看各level数据量\nWITH geo_unique_counts AS (\n    SELECT\n        'brand_lv1' AS level,\n        COUNT(DISTINCT brand_lv1) AS new_counts\n    FROM public.dim_product\n    UNION ALL\n    SELECT\n        'brand_lv2',\n        COUNT(DISTINCT brand_lv2)\n    FROM public.dim_product\n    UNION ALL\n    SELECT\n        'brand_lv3',\n        COUNT(DISTINCT brand_lv3)\n    FROM public.dim_product\n    UNION ALL\n    SELECT\n        'brand_lv4',\n        COUNT(DISTINCT brand_lv4)\n    FROM public.dim_product\n    UNION ALL\n    SELECT\n        'brand_lv5',\n        COUNT(DISTINCT brand_lv5)\n    FROM public.dim_product\n    UNION ALL\n    SELECT\n        'brand_lv6',\n        COUNT(DISTINCT brand_lv6)\n    FROM public.dim_product\n    UNION ALL\n    SELECT\n        'brand_lv7',\n        COUNT(DISTINCT brand_lv7)\n    FROM public.dim_product\n    UNION ALL\n    SELECT\n        'brand_lv8',\n        COUNT(DISTINCT brand_lv8)\n    FROM public.dim_product\n),\ngeo_arc_unique_counts AS (\n    SELECT\n        'brand_lv1' AS level,\n        COUNT(DISTINCT brand_lv1) AS arc_counts\n    FROM public.dim_product_arc\n    UNION ALL\n    SELECT\n        'brand_lv2',\n        COUNT(DISTINCT brand_lv2)\n    FROM public.dim_product_arc\n    UNION ALL\n    SELECT\n        'brand_lv3',\n        COUNT(DISTINCT brand_lv3)\n    FROM public.dim_product_arc\n    UNION ALL\n    SELECT\n        'brand_lv4',\n        COUNT(DISTINCT brand_lv4)\n    FROM public.dim_product_arc\n    UNION ALL\n    SELECT\n        'brand_lv5',\n        COUNT(DISTINCT brand_lv5)\n    FROM public.dim_product_arc\n    UNION ALL\n    SELECT\n        'brand_lv6',\n        COUNT(DISTINCT brand_lv6)\n    FROM public.dim_product_arc\n    UNION ALL\n    SELECT\n        'brand_lv7',\n        COUNT(DISTINCT brand_lv7)\n    FROM public.dim_product_arc\n    UNION ALL\n    SELECT\n        'brand_lv8',\n        COUNT(DISTINCT brand_lv8)\n    FROM public.dim_product_arc\n)\nSELECT\n    g.level,\n    g.new_counts,\n    a.arc_counts\nFROM geo_unique_counts g\nJOIN geo_arc_unique_counts a ON g.level = a.level;"
+    ],
+    "fact_propel_sales_external": [
+      "-- 对比新旧fact_propel_sales_external表，按year和period查看数据量\nselect coalesce(sa.\"years\",s.\"years\") as \"years\",  coalesce(sa.\"period\",s.\"period\") as \"period\",new_counts, old_counts \nfrom (select \"years\", \"period\", count(*) as new_counts from fact_propel_sales_external group by 1,2) s\nfull outer join (select \"years\", \"period\", count(*) as old_counts from fact_propel_sales_external_arc group by 1,2) sa on sa.\"years\" = s.\"years\" and sa.\"period\" = s.\"period\" \norder by 1,2;"
+    ],
+    "fact_iqvia_mth_gmd_ms": [
+    ],
+    "fact_iqvia_qtr_gmd_ms": [
+      "-- 对比新旧iqvia_gmd_product表，查看新表是否有遗漏数据\nselect * from iqvia_gmd_product_arc\nexcept\nselect * from iqvia_gmd_product; "
+    ],
+    "fact_iqvia_qtr_corp_rnk": [
+    ],
+    "fact_ireal_mainlist": [
+    ]
+  },
+  "uniqueness": {},
+  "connectedness": {},
+  "consistency": {}
+}

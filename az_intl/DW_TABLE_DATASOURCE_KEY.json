@@ -1,0 +1,22 @@
+[
+  {
+    "name": "az_full",
+    "priority": 1,
+    "tables": [
+      "dim_geo",
+      "dim_product",
+      "fact_propel_sales_external",
+      "fact_iqvia_mth_gmd_ms",
+      "fact_iqvia_qtr_gmd_ms",
+      "fact_iqvia_qtr_corp_rnk",
+      "fact_ireal_mainlist"
+    ]
+  },
+    {
+    "name": "ireal",
+    "priority": 2,
+    "tables": [
+      "fact_ireal_mainlist"
+    ]
+  }
+]

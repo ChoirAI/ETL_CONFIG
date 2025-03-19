@@ -1,0 +1,23 @@
+{
+  "completeness": {
+    "bi_scope_lookup": [
+      "select coalesce(bsla.\"type\",bsl.\"type\") as \"type\", coalesce(bsla.\"level\",bsl.\"level\") as \"level\", new_counts, old_counts \nfrom (select type, level, count(*) as new_counts from bi_scope_lookup group by 1,2) bsl\nfull outer join (select type, level, count(*) as old_counts from bi_scope_lookup_arc group by 1,2) bsla on bsla.\"type\" = bsl.\"type\" and bsla.\"level\" = bsl.\"level\" \norder by 1,3; ",
+      "select range_standard_name, array_agg(distinct range_local_name), array_agg(distinct \"level\")  from bi_scope_lookup\nwhere range_standard_name in (select distinct range_standard_name from bi_scope_lookup where level = 'geo_territory_cluster')\nand level not in ('product_cluster','geo_territory_cluster','full_name')\ngroup by range_standard_name\nhaving count(distinct \"level\")>1;"
+    ],
+    "bi_source_table_info": [
+      "select * from bi_source_table_info;",
+      "select max(\"Cycle\") from \"InsTrtyProductCycleData\" where \"SalesValue\" > 0;",
+      "select max(\"Cycle\") from \"AreaMarketCycleData\";",
+      "select max(\"Cycle\") from \"InsMarketCycleData\";",
+      "select max(replace(\"EventDate\",'before','')) from \"InsProdListingEvent\";"
+    ],
+    "bi_scope_affiliation": [
+      "select coalesce(bsa.scope1_type,bsaa.scope1_type) as scope1_type, coalesce(bsa.scope1_level,bsaa.scope1_level) as scope1_level, coalesce(bsa.scope2_level,bsaa.scope2_level) as scope2_level, new_counts, old_counts \nfrom (select scope1_type, scope1_level, scope2_level, count(*) as new_counts from bi_scope_affiliation bsa group by 1,2,3) bsa\nfull outer join (select scope1_type, scope1_level, scope2_level, count(*) as old_counts from bi_scope_affiliation_arc bsaa  group by 1,2,3) bsaa on bsa.scope1_type=bsaa.scope1_type and bsa.scope1_level=bsaa.scope1_level and bsa.scope2_level=bsaa.scope2_level \norder by scope1_type desc, scope1_level;",
+      "select count(*) from bi_scope_affiliation;"
+    ],
+    "bi_user_profile": [
+      "select coalesce(bup.\"level\",bupa.\"level\") as \"level\", user_counts_new, user_counts_old \nfrom (select \"level\", count(*) as user_counts_new from bi_user_profile group by level) bup\nfull outer join (select \"level\", count(*) as user_counts_old from bi_user_profile_arc group by level) bupa on bup.\"level\" = bupa.\"level\" \norder by 1,3;",
+      "select products, array_length(products,1) as product_counts, \nmarkets, array_length(markets,1) as market_counts, \ncompetitor_cpa, array_length(competitor_cpa,1) as cpa_brand_counts, \ncompetitor_ims, array_length(competitor_ims,1) as ims_brand_counts, \narray_agg(distinct \"level\"||': '||array_to_string(territory, ',')) as territories_share_same_permission  \nfrom bi_user_profile group by products, markets, competitor_cpa, competitor_ims order by 2 desc, 4 desc;"
+    ]
+  }
+}

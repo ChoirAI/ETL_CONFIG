@@ -1,0 +1,132 @@
+{
+  "AreaMarketCycleData": [
+    "Cycle",
+    "ExternalAreaID",
+    "MarketName",
+    "ExternalProductID"
+  ],
+  "AreaMarketMonthData": [
+    "month_text",
+    "externalareaid",
+    "marketname",
+    "externalproductid"
+  ],
+  "AreaMarketQuarterData": [
+    "quarter_text",
+    "externalareaid",
+    "marketname",
+    "externalproductid"
+  ],
+  "Geography": [
+    "CountryID"
+  ],
+  "InsMarketCycleData": [
+    "InstitutionID",
+    "ExternalProductID",
+    "MarketName",
+    "Cycle"
+  ],
+  "InsMarketMonthData": [
+    "institutionid",
+    "externalproductid",
+    "marketname",
+    "month_text"
+  ],
+  "InsMarketQuarterData": [
+    "institutionid",
+    "externalproductid",
+    "marketname",
+    "quarter_text"
+  ],
+  "InsProdListing": [
+    "InstitutionID",
+    "ProductID"
+  ],
+  "InsProdListingEvent": [
+    "InstitutionID",
+    "ProductID",
+    "ListingStatus"
+  ],
+  "InsProdPotential": [
+    "InstitutionID",
+    "InstitutionName_EN",
+    "ProductID",
+    "MarketName"
+  ],
+  "InsProdProperty": [
+    "InstitutionID",
+    "InstitutionName_EN",
+    "ProductID"
+  ],
+  "InsTrtyProductChannelCycleData": [
+    "InsID",
+    "RepTerritoryCode",
+    "ProductID",
+    "Cycle",
+    "SubInsType"
+  ],
+  "InsTrtyProductCycleData": [
+    "InsID",
+    "RepTerritoryCode",
+    "ProductID",
+    "Cycle"
+  ],
+  "InsTrtyProductMonthChannelData": [
+    "month_text",
+    "sales_channel",
+    "repterritorycode",
+    "productid"
+  ],
+  "InsTrtyProductMonthData": [
+    "month_text",
+    "insid",
+    "repterritorycode",
+    "productid"
+  ],
+  "InsTrtyProductQuarterChannelData": [
+    "quarter_text",
+    "sales_channel",
+    "repterritorycode",
+    "productid"
+  ],
+  "InsTrtyProductQuarterData": [
+    "quarter_text",
+    "insid",
+    "repterritorycode",
+    "productid"
+  ],
+  "Institution": [
+    "InstitutionID"
+  ],
+  "LowPerformanceDetail": [
+    "BUHTerritoryName"
+  ],
+  "MarketAreaMapping": [
+    "GeographyID",
+    "IMS_ExternalAreaID"
+  ],
+  "OrgCycle": [
+    "Cycle"
+  ],
+  "Product": [
+    "ProductID"
+  ],
+  "ProductMapping": [
+    "ProductID"
+  ],
+  "TerritoryAreaMapping": [
+    "BUHTerritoryID",
+    "ExternalAreaID"
+  ],
+  "TerritoryCycleCost": [
+    "Cycle",
+    "FLMTerritoryID"
+  ],
+  "TerritoryCycleHR": [
+    "Cycle",
+    "TerritoryID"
+  ],
+  "dim_calendar": [
+    "date_text"
+  ]
+}

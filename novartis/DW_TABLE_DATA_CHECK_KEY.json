@@ -1,0 +1,225 @@
+{
+
+	"raw_table_check": {
+		"Product": [
+			"select count(*) as total_count, count(distinct ta_id) as ta_id_count, count(distinct family_id) as family_id_count, count(distinct pl_id) as pl_id_count, count(distinct brand_id) as brand_id_count, count(distinct sku_id) as sku_id_count from \"product_raw\";"
+		],
+		"ProductMapping":[
+			"select count(*) as total_count, count(distinct \"productid\") as productid_count, count(distinct \"market\") as market_count, COUNT(DISTINCT CASE WHEN \"iskeymarket\" IN ('Y') THEN \"productid\" END) AS key_product_count from \"productmapping_raw\";"
+		],
+		"OrgCycle": [
+			"select count(*) as total_count, count(distinct \"buhterritoryid\") as buhterritoryid_count, count(distinct \"fhterritoryid\") as fhterritoryid_count, count(distinct \"tlmterritoryid\") as tlmterritoryid_count, count(distinct \"slmterritoryid\") as slmterritoryid_count, count(distinct \"flmterritoryid\") as flmterritoryid_count, count(distinct \"repterritoryid\") as repterritoryid_count from \"orgcycle_raw\" where \"cycle\" = (select max(\"cycle\") from \"orgcycle_raw\");"
+		],
+		"Geography": [
+			"select count(*) as total_count, count(distinct \"countyid\") as countyid_count, count(distinct \"cityid\") as cityid_count, count(distinct \"provinceid\") as provinceid_count from \"geography_raw\";"
+		],
+		"Institution": [
+			"select count(*) as total_count, count(distinct institutionid) as institutionid_count from \"institution_raw\";"
+		],
+		"InsProdProperty": [
+			"select count(*) as total_count, count(distinct brand) as brand_count, count(distinct institutionid) as institutionid_count from \"insprodproperty_raw\";"
+		],
+		"MarketAreaMapping": [
+			"select count(*) as total_count, count(distinct \"geographyid\") as geographyid_count from \"marketareamapping_raw\";"
+		],
+		"TerritoryAreaMapping": [
+			"select count(*) as total_count, count(distinct \"tlmterritoryid\") as tlmterritoryid_count, count(distinct \"slmterritoryid\") as slmterritoryid_count from \"territoryareamapping_raw\";"
+		],
+		"InsTrtyProductCycleData": [
+			"select count(*) as total_count, sum(salesvalue) as salesvalue_sum, sum(targetvalue) as targetvalue_sum, sum(lysalesvalue) as lysalesvalue_sum, sum(salesunit) as salesunit_sum, sum(lysalesunit) as lysalesunit_sum, sum(targetunit) as targetunit_sum from \"instrtyproductcycledata_raw\"; "
+		],
+		"InsTrtyProductChannelCycleData": [
+			"select count(*) as total_count, sum(salesvalue) as salesvalue_sum, sum(lysalesvalue) as lysalesvalue_sum, sum(salesunit) as salesunit_sum, sum(lysalesunit) as lysalesunit_sum from \"instrtyproductchannelcycledata_raw\"; "
+		],
+		"AreaMarketCycleData": [
+			"select count(*) as total_count, sum(salesvalue::numeric(255,8)) as salesvalue_sum, sum(lysalesvalue::numeric(255,8)) as lysalesvalue_sum from \"areamarketcycledata_raw\";"
+		],
+		"InsMarketCycleData": [
+			"select count(*) as total_count, sum(salesvalue) as salesvalue_sum, sum(lysalesvalue) as lysalesvalue_sum, sum(salesunit) as salesunit_sum, sum(lysalesunit) as lysalesunit_sum from \"insmarketcycledata_raw\";"
+		],
+		"InsProdListing": [
+			"select count(*) as total_count, count(distinct institutionid) as institutionid_count, count(distinct institutionid) filter(where listingstatus = '正式进院') as institutionid_count, count(distinct institutionid) filter(where listingstatus = '临采') as institutionid_count from \"insprodlisting_raw\";"
+		],
+		"LowPerformance": [
+			"select count(*) as total_count, sum(nullif(productivity,'')::numeric(255,8)) as productivity_sum from \"lowperformance_raw\";"
+		]
+	},
+	"completeness":{
+		"Product":[
+			"select \"PrimaryMarket\", array_agg(distinct \"ProductName\") from \"Product\" group by \"PrimaryMarket\";",
+			"select itpcd.\"ProductName\" from \"InsTrtyProductCycleData\" itpcd left join \"Product\" p on itpcd.\"ProductID\" = p.\"ProductID\" where p.\"ProductID\" is null;"
+		],
+		"ProductMapping":[
+			"select \"Market\", array_agg(distinct \"ProductName\") from \"ProductMapping\" group by \"Market\";",
+			"select itpcd.\"ProductName\" from \"InsTrtyProductCycleData\" itpcd left join \"ProductMapping\" pm on itpcd.\"ProductID\" = pm.\"ProductID\" where pm.\"ProductID\" is null;"
+		],
+		"OrgCycle":[
+			"select max(\"Cycle\"), array_agg(distinct \"Cycle\") from \"OrgCycle\" oc;",
+			"select \"BUHTerritoryName\", \"FHTerritoryName\", array_agg(distinct \"Cycle\") from \"OrgCycle\" group by \"BUHTerritoryName\", \"FHTerritoryName\" order by 1,2;"
+		],
+		"Geography":[
+			"select \"ProvinceID\", \"ProvinceName\", array_agg(distinct \"CityName\"), array_agg(distinct \"CountyName\")  from \"Geography\" group by \"ProvinceID\", \"ProvinceName\";",
+			"select * from \"Institution\" i left join \"Geography\" g on i.\"CountyID\" = g.\"CountyID\" where g.\"CountyID\" is null;"
+		],
+		"Institution":[
+			"select * from \"InsTrtyProductCycleData\" itpcd \nleft join \"Institution\" i on itpcd.\"InsID\" = i.\"InstitutionID\" \nwhere i.\"InstitutionID\" is null;"
+		],
+		"InsProdProperty":[
+			"select * from \"InsProdProperty\" ipp \nleft join \"Product\" p on ipp.\"ProductID\" = p.\"ProductID\" \nwhere p.\"ProductID\" is null;"
+		],
+		"dim_calendar":[
+			"select array_agg(distinct year_text) from dim_calendar;",
+			"select distinct itpcd.\"Cycle\" from \"InsTrtyProductCycleData\" itpcd\nleft join dim_calendar dc on itpcd.\"Cycle\" = dc.month_text \nwhere dc.month_text is null;"
+		],
+		"MarketAreaMapping":[
+			"select * from \"AreaMarketCycleData\" amcd left join \"MarketAreaMapping\" mam on amcd.\"ExternalAreaID\" = mam.\"IMS_ExternalAreaID\" where mam.\"GeographyID\" is null;"
+		],
+		"TerritoryAreaMapping":[
+			"select * from \"AreaMarketCycleData\" amcd \nleft join \"TerritoryAreaMapping\" tam on amcd.\"ExternalAreaID\" = tam.\"ExternalAreaID\" where tam.\"ExternalAreaID\" is null limit 100;",
+			"select amcd.\"ExternalAreaName\", amcd.\"MarketName\", array_agg(distinct tam.\"SLMTerritoryName\") from \"AreaMarketCycleData\" amcd join \"TerritoryAreaMapping\" tam on amcd.\"ExternalAreaID\" = tam.\"ExternalAreaID\" and amcd.\"MarketName\" = tam.\"MarketName\" group by amcd.\"ExternalAreaName\", amcd.\"MarketName\" limit 100;"
+		],
+		"InsTrtyProductCycleData":[
+			"select count(*) from \"InsTrtyProductCycleData\";",
+			"select count(*) from \"instrtyproductcycledata_raw\";",
+			"select sum(\"TargetValue\"), sum(\"SalesValue\"), sum(\"LYSalesValue\"), sum(\"SalesUnit\"), sum(\"LYSalesUnit\") from \"InsTrtyProductCycleData\";",
+			"select sum(targetvalue), sum(salesvalue), sum(lysalesvalue), sum(salesunit), sum(salesunit) from \"instrtyproductcycledata_raw\";",
+			"select itpcd.\"ProductID\", itpcd.\"ProductName\", itpcd.\"ProductName_EN\", p.\"PrimaryMarket\", array_agg(distinct \"Cycle\")  from \"InsTrtyProductCycleData\" itpcd\njoin \"Product\" p on itpcd.\"ProductID\" = p.\"ProductID\"\ngroup by itpcd.\"ProductID\", itpcd.\"ProductName\", itpcd.\"ProductName_EN\", p.\"PrimaryMarket\";"
+		],
+		"InsTrtyProductChannelCycleData":[
+			"select distinct \"Cycle\" from \"InsTrtyProductChannelCycleData\";",
+			"select count(distinct \"InsID\") as ins_counts, count(distinct \"RepTerritoryCode\") as territory_counts, count(distinct \"ProductID\") as prod_counts, count(distinct \"SubInsType\") as channel_counts, count(distinct \"Cycle\") as cycle_counts from \"InsTrtyProductChannelCycleData\";",
+			"select \"ProductName_EN\", count(*) from \"InsTrtyProductChannelCycleData\" where \"Cycle\" = (select max(\"Cycle\") from \"InsTrtyProductChannelCycleData\") group by \"ProductName_EN\"; ",
+			"select count(*), sum(\"SalesValue\") from \"InsTrtyProductChannelCycleData_arc\";",
+			"select count(*), sum(\"SalesValue\") from \"InsTrtyProductChannelCycleData\";",
+			"select count(*), sum(salesvalue) from \"instrtyproductchannelcycledata_raw\";",
+			"select array_agg(distinct \"SubInsType\") from \"InsTrtyProductChannelCycleData\";"
+		],
+		"AreaMarketCycleData":[
+			"select count(*), sum(\"SalesValue\"), sum(\"LYSalesValue\") from \"AreaMarketCycleData\";",
+			"select count(*), sum(\"salesvalue\"::numeric(255,8)), sum(\"lysalesvalue\"::numeric(255,8)) from \"areamarketcycledata_raw\";",
+			"select \"MarketName\", array_agg(distinct \"ProductName\"), count(*) from \"AreaMarketCycleData\" group by \"MarketName\" ;",
+			"select distinct \"IsInternalProduct\" from \"AreaMarketCycleData\";"
+		],
+		"InsMarketCycleData":[
+			"select count(*), sum(\"SalesValue\"), sum(\"LYSalesValue\") from \"InsMarketCycleData\"; ",
+			"select count(*), sum(salesvalue::numeric(255,8)), sum(lysalesvalue::numeric(255,8)) from \"insmarketcycledata_raw\";",
+			"select \"MarketName\", array_agg(distinct \"ProductName\"), count(*) from \"InsMarketCycleData\" group by \"MarketName\" ;",
+			"select * from \"InsMarketCycleData\" limit 100;"
+		],
+		"InsProdListing": [
+			"select * from \"InsProdListing\" ipl left join \"Institution\" i on ipl.\"InstitutionID\" = i.\"InstitutionID\" where i.\"InstitutionID\" is null;"
+		],
+		"LowPerformance": [
+			"select * from \"LowPerformanceDetail\" lpd \nleft join \"OrgCycle\" oc on lpd.\"RepTerritoryName\" = oc.\"RepTerritoryName\" and oc.\"Cycle\" = (select max(\"Cycle\") from public.\"InsTrtyProductCycleData\" where \"SalesValue\" > 0)\nwhere oc.\"RepTerritoryName\" is null;",
+			"select * from \"OrgCycle\" oc\nleft join \"LowPerformanceDetail\" lpd  on lpd.\"RepTerritoryName\" = oc.\"RepTerritoryName\"\nwhere oc.\"Cycle\" = (select max(\"Cycle\") from public.\"InsTrtyProductCycleData\" where \"SalesValue\" > 0)\nand oc.\"RepName\" not like '%_TBA'\nand lpd.\"RepTerritoryName\" is null;"
+		]
+	},
+	"uniqueness":{
+		"Product":[
+			"select \"ProductID\" from \"Product\" group by \"ProductID\" having count(*)>1;"
+		],
+		"ProductMapping":[
+			"select \"ProductID\",\"Market\" from \"ProductMapping\" group by \"ProductID\",\"Market\" having count(*)>1;",
+			"select \"ProductID\" from \"ProductMapping\" where \"IsKeyMarket\" group by \"ProductID\" having count(*)>1;"
+		],
+		"OrgCycle":[
+			"select \"Cycle\", \"RepTerritoryID\" from \"OrgCycle\" oc group by \"Cycle\", \"RepTerritoryID\" having count(*)>1;"
+		],
+		"Geography":[
+			"select \"CountyID\" from \"Geography\" group by \"CountyID\" having count(*)>1;"
+		],
+		"Institution":[
+			"select \"InstitutionID\" from \"Institution\" group by \"InstitutionID\" having count(*)>1;"
+		],
+		"InsProdProperty":[
+			"select \"InstitutionID\", \"ProductID\" from \"InsProdProperty\" group by \"InstitutionID\", \"ProductID\" having count(*)>1 limit 10;"
+		],
+		"dim_calendar":[
+			"select \"date\" from dim_calendar group by \"date\" having count(*)>1; "
+		],
+		"MarketAreaMapping":[
+			"select \"IMS_ExternalAreaID\" from \"MarketAreaMapping\" group by \"IMS_ExternalAreaID\" having count(*)>1;"
+		],
+		"TerritoryAreaMapping":[
+			"select \"SLMTerritoryID\", \"ExternalAreaID\", \"MarketName\" from \"TerritoryAreaMapping\" group by \"SLMTerritoryID\", \"ExternalAreaID\", \"MarketName\" having count(*)>1 limit 100; "
+		],
+		"InsTrtyProductCycleData":[
+			"select  \"InsID\",\"RepTerritoryCode\",\"Cycle\",\"ProductID\", count(*) from \"InsTrtyProductCycleData\" group by \"InsID\",\"RepTerritoryCode\",\"Cycle\",\"ProductID\" having count(*)>1;"
+		],
+		"InsTrtyProductChannelCycleData":[
+			 "select \"RepTerritoryCode\", \"Cycle\", \"InsID\", \"SubInsType\", \"ProductID\", count(*) from \"InsTrtyProductChannelCycleData\" group by \"RepTerritoryCode\", \"Cycle\", \"InsID\", \"SubInsType\", \"ProductID\" having count(*)>1;"
+		],
+		"AreaMarketCycleData":[
+			"select  \"ExternalAreaID\", \"MarketName\", \"ExternalProductName\", \"Cycle\", count(*) from \"AreaMarketCycleData\" group by \"ExternalAreaID\", \"MarketName\", \"ExternalProductName\", \"Cycle\" having count(*)>1;"
+		],
+		"InsMarketCycleData":[
+			"select \"InstitutionID\", \"MarketName\", \"ExternalProductID\", \"Cycle\", count(*) from \"InsMarketCycleData\" group by \"InstitutionID\", \"MarketName\", \"ExternalProductID\", \"Cycle\" having count(*)>1;"
+		],
+		"InsProdListing": [
+			"select \"InstitutionID\", \"ProductID\" from \"InsProdListing\" group by \"InstitutionID\", \"ProductID\" having count(*)>1;"
+		],
+		"LowPerformance": [
+			"select \"RepTerritoryName\" from \"LowPerformanceDetail\" group by \"RepTerritoryName\" having count(*)>1; "
+		]
+	},
+	"connectedness":{
+		"Product":[
+			"select distinct itpcd.\"ProductName\" from \"InsTrtyProductCycleData\" itpcd join \"Product\" p on itpcd.\"ProductID\" = p.\"ProductID\";"
+		],
+		"ProductMapping":[
+			"select distinct itpcd.\"ProductName\" from \"InsTrtyProductCycleData\" itpcd join \"ProductMapping\" pm on itpcd.\"ProductID\" = pm.\"ProductID\" and pm.\"IsKeyMarket\";",
+			"select pm.\"Market\", \"ExternalProductID\", \"ExternalProductName\", array_agg(distinct \"Cycle\")  from \"InsMarketCycleData\" imcd join \"ProductMapping\" pm on imcd.\"ExternalProductID\" = pm.\"CPA_ProductID\" and imcd.\"MarketName\" = pm.\"Market\" \ngroup by pm.\"Market\", \"ExternalProductID\", \"ExternalProductName\";"
+		],
+		"OrgCycle":[
+			"select oc.\"FHTerritoryName\", array_agg(distinct itpcd.\"Cycle\")  from \"InsTrtyProductCycleData\" itpcd join \"OrgCycle\" oc on itpcd.\"RepTerritoryCode\" = oc.\"RepTerritoryID\" and oc.\"Cycle\" = (select max(\"Cycle\") from \"OrgCycle\" oc2) group by oc.\"FHTerritoryName\" limit 100;"
+		],
+		"Geography":[
+			"select * from \"Institution\" i join \"Geography\" g on i.\"CountyID\" = g.\"CountyID\";"
+		],
+		"Institution":[
+			"select * from \"InsTrtyProductCycleData\" itpcd \njoin \"Institution\" i on itpcd.\"InsID\" = i.\"InstitutionID\" limit 100;",
+			"select * from \"InsMarketCycleData\" imcd \njoin \"Institution\" i on imcd.\"InstitutionID\" = i.\"InstitutionID\" limit 100;",
+			"select * from \"InsProdListing\" ipl \njoin \"Institution\" i on ipl.\"InstitutionID\" = i.\"InstitutionID\" limit 100;"
+		],
+		"InsProdProperty":[
+			"select * from \"InsProdProperty\" ipp\njoin \"Institution\" i on ipp.\"InstitutionID\" = i.\"InstitutionID\" limit 100;"
+		],
+		"dim_calendar":[
+			"select distinct itpcd.\"Cycle\" from \"InsTrtyProductCycleData\" itpcd\njoin dim_calendar dc on itpcd.\"Cycle\" = dc.month_text;"
+		],
+		"MarketAreaMapping":[
+			"select * from \"AreaMarketCycleData\" amcd join \"MarketAreaMapping\" mam on amcd.\"ExternalAreaID\" = mam.\"IMS_ExternalAreaID\" join \"Geography\" g on mam.\"GeographyID\" = g.\"CityID\" limit 100;"
+		],
+		"TerritoryAreaMapping":[
+			"select * from \"AreaMarketCycleData\" amcd \njoin \"TerritoryAreaMapping\" tam on amcd.\"ExternalAreaID\" = tam.\"ExternalAreaID\" and amcd.\"MarketName\" = tam.\"MarketName\" \njoin \"OrgCycle\" oc on tam.\"SLMTerritoryID\" = oc.\"SLMTerritoryID\" and oc.\"Cycle\" = (select max(\"Cycle\") from \"InsTrtyProductCycleData\" itpcd where \"SalesValue\" > 0) limit 100;"
+		],
+		"InsTrtyProductCycleData":[
+			"select oc.\"BUHTerritoryName\", array_agg(distinct itpcd.\"Cycle\")  from \"InsTrtyProductCycleData\" itpcd join \"OrgCycle\" oc on itpcd.\"RepTerritoryCode\" = oc.\"RepTerritoryID\" and oc.\"Cycle\" = (select max(\"Cycle\") from \"InsTrtyProductCycleData\" itpcd where \"SalesValue\" > 0 ) group by oc.\"BUHTerritoryName\" limit 100;"
+		],
+		"InsTrtyProductChannelCycleData":[
+			"select itpcd.\"ProductID\", itpcd.\"ProductName\", itpcd.\"ProductName_EN\", array_agg(distinct \"Cycle\")  from \"InsTrtyProductChannelCycleData\" itpcd\njoin \"Product\" p on itpcd.\"ProductID\" = p.\"ProductID\"\ngroup by itpcd.\"ProductID\", itpcd.\"ProductName\", itpcd.\"ProductName_EN\", p.\"PrimaryMarket\";",
+			"select itpcd.productname, array_agg(distinct cycle)  from \"instrtyproductchannelcycledata_raw\" itpcd\ngroup by itpcd.productname;",
+			"select oc.\"BUHTerritoryName\", array_agg(distinct itpcd.\"Cycle\")  from \"InsTrtyProductCycleData\" itpcd join \"OrgCycle\" oc on itpcd.\"RepTerritoryCode\" = oc.\"RepTerritoryID\" and oc.\"Cycle\" = (select max(\"Cycle\") from \"InsTrtyProductCycleData\" itpcd where \"SalesValue\" > 0 ) group by oc.\"BUHTerritoryName\" ;"
+		],
+		"AreaMarketCycleData":[
+			"select \"ExternalProductID\", \"ExternalProductName\", \"ExternalProductName_EN\", pm.\"Market\", array_agg(distinct \"Cycle\")  from \"AreaMarketCycleData\" amcd join \"ProductMapping\" pm on amcd.\"ExternalProductID\" = pm.\"IMS_ProductID\" group by \"ExternalProductID\", \"ExternalProductName\", \"ExternalProductName_EN\", pm.\"Market\";"
+		],
+		"InsMarketCycleData":[
+			"select pm.\"Market\", \"ExternalProductID\", \"ExternalProductName\", array_agg(distinct \"Cycle\")  from \"InsMarketCycleData\" imcd join \"ProductMapping\" pm on imcd.\"ExternalProductID\" = pm.\"CPA_ProductID\" and imcd.\"MarketName\" = pm.\"Market\" group by pm.\"Market\", \"ExternalProductID\", \"ExternalProductName\";"
+		],
+		"InsProdListing": [
+			"select * from \"InsProdListing\" ipl join \"Institution\" i on ipl.\"InstitutionID\" = i.\"InstitutionID\" join \"Product\" p on ipl.\"ProductID\" = p.\"ProductID\";"
+		],
+		"LowPerformance": [
+			"select * from \"LowPerformanceDetail\" lpd \njoin \"OrgCycle\" oc on lpd.\"RepTerritoryName\" = oc.\"RepTerritoryName\" and oc.\"Cycle\" = (select max(\"Cycle\") from public.\"InsTrtyProductCycleData\" where \"SalesValue\" > 0);"
+		]
+	},
+	"consistency":{
+		"AreaMarketCycleData":[
+			"select count(distinct \"ExternalAreaID\") as area_count, count(distinct \"MarketName\"||'~'||\"ExternalProductID\") as prod_mkt_count, count(distinct \"Cycle\") as cycle_count, count(*) as record_count, array_agg(distinct \"MarketName\"), array_agg(distinct \"MarketName\"||'~'||\"ExternalProductID\") from \"AreaMarketCycleData\";"
+		],
+		"InsMarketCycleData":[
+			"select count(distinct \"InstitutionID\") as ins_count, count(distinct \"MarketName\"||'~'||\"ExternalProductID\") as prod_mkt_count, count(distinct \"Cycle\") as cycle_count, count(*) as record_count, array_agg(distinct \"MarketName\"), array_agg(distinct \"MarketName\"||'~'||\"ExternalProductID\") from \"InsMarketCycleData\";"
+		]
+	}
+}
