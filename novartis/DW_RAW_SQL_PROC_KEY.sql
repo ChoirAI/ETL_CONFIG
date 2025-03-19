@@ -503,8 +503,6 @@ $procedure$
 
 
 
-
-
 -- DROP PROCEDURE public.proc_cleanse_areamarketcycledata();
 
 CREATE OR REPLACE PROCEDURE public.proc_cleanse_areamarketcycledata()
@@ -541,7 +539,8 @@ CREATE TABLE "AreaMarketCycleData" (
         "MarketValueSize" numeric(28, 8) NULL,
         "LYMarketValueSize" numeric(28, 8) NULL,
         "MarketUnitSize" numeric(28, 8) NULL,
-        "LYMarketUnitSize" numeric(28, 8) NULL
+        "LYMarketUnitSize" numeric(28, 8) NULL,
+        CONSTRAINT areamarketcycledata_pk PRIMARY KEY ("ExternalAreaID", "ExternalProductID", "MarketName", "Cycle")
 );
 
 -- 1. Standardize column names and calculate MarketSize
@@ -555,7 +554,7 @@ select
     "marketname"::varchar(100) as "MarketName",
     min("externalproductid")::varchar(100) as "ExternalProductID",
     coalesce(externalproductgroup, externalproductgroup_en)::varchar(100) as "ExternalProductName",
-    max(split_part("externalproductname_en", '  ',1))::varchar(100) as "ExternalProductName_EN",
+    max("externalproductgroup_en")::varchar(100) as "ExternalProductName_EN",
     case when max(pm."ProductID") is not null then true else false end as "IsInternalProduct",
     max(pm."ProductID") as "ProductID",
     max(pm."ProductName") as "ProductName",
@@ -570,56 +569,27 @@ select
     sum(sum("lysalesunit"::numeric(28,8)))over(partition by "externalareaid", "marketname", "cycle") as "LYMarketUnitSize"
 from "areamarketcycledata_raw" amcdr
 left join "ProductMapping" pm on amcdr.externalproductid = pm."IMS_ProductID" and upper(amcdr.marketname) = pm."Market"
-where upper(amcdr.marketname) in (select distinct p."PrimaryMarket" from "OrgCycle" oc
-        join "InsTrtyProductCycleData" itpcd on oc."RepTerritoryID" = itpcd."RepTerritoryCode" and oc."Cycle" = (select max("Cycle") from "OrgCycle" oc2)
-        join "Product" p on itpcd."ProductID" = p."ProductID"
-        where p."PrimaryMarket" is not null)
+where upper(amcdr.marketname) in (select distinct pm."Market"  from "OrgCycle" oc 
+                join "InsTrtyProductCycleData" itpcd on oc."RepTerritoryID" = itpcd."RepTerritoryCode" and oc."Cycle" = (select max("Cycle") from "OrgCycle" oc2)
+                join "Product" p on itpcd."ProductID" = p."ProductID"
+                join "ProductMapping" pm on p."BrandID" = pm."ProductID" 
+                where pm."Market" is not null)
 group by
     "externalareaid",
     "marketname",
     "cycle",
-    coalesce(externalproductgroup, externalproductgroup_en); -- 34680
+    coalesce(externalproductgroup, externalproductgroup_en); -- 232272
 
 -- 1.1 Update IsInternalProduct, ProductID, ProductName, ProductName_EN
 update "AreaMarketCycleData_1" amcd set "IsInternalProduct" = true, "ProductID" = pm."ProductID", "ProductName" = pm."ProductName", "ProductName_EN" = pm."ProductName_EN"
-from "ProductMapping" pm where amcd."ExternalProductID" = pm."IMS_ProductID" and amcd."MarketName" = pm."Market" ; --7677
+from "ProductMapping" pm where amcd."ExternalProductID" = pm."IMS_ProductID" and amcd."MarketName" = pm."Market" ; --38616
 
 RAISE NOTICE 'AMCD Step1 - Standardize columns done';
 
 -- 2. Create a Cartesian table with the CROSS JOIN of ins+prod_mkt+cycle
-drop table if exists "AreaMarketCycleData_2";
-create table "AreaMarketCycleData_2" as select * from "AreaMarketCycleData_1" where 1=2;
--- 2.1 insert Cross-join result as a framework
-INSERT INTO "AreaMarketCycleData_2"
-("Cycle", "ExternalAreaID", "ExternalAreaName", "ExternalAreaName_EN", "MarketName", "ExternalProductID", "ExternalProductName", "ExternalProductName_EN", "IsInternalProduct", "ProductID", "ProductName", "ProductName_EN")
-select "Cycle", "ExternalAreaID", "ExternalAreaName", "ExternalAreaName_EN", "MarketName", "ExternalProductID", "ExternalProductName", "ExternalProductName_EN", "IsInternalProduct", "ProductID", "ProductName", "ProductName_EN"
-from (select distinct "MarketName", "ExternalProductID", max("ExternalProductName") as "ExternalProductName", max("ExternalProductName_EN") as "ExternalProductName_EN", max("IsInternalProduct"::text)::bool as "IsInternalProduct", max("ProductID") as "ProductID", max("ProductName") as "ProductName", max("ProductName_EN") as "ProductName_EN" from "AreaMarketCycleData_1" group by "MarketName", "ExternalProductID") prod
-join (select distinct "Cycle" from "AreaMarketCycleData_1") cal on 1=1
-join (select distinct "ExternalAreaID", "ExternalAreaName", "ExternalAreaName_EN" from "AreaMarketCycleData_1") geo on 1=1;--35712 (32*18*62)
-
-drop index if exists amcd2_pk_idx;
-CREATE INDEX amcd2_pk_idx ON public."AreaMarketCycleData_2" ("Cycle","ExternalAreaID","MarketName","ExternalProductID");
-RAISE NOTICE 'AMCD Step2.1 - Create Cross Join table done';
-
--- 2.2 Attach values to the Cartesian table
-update "AreaMarketCycleData_2" f
-set
-        "SalesValue" = f1."SalesValue",
-        "LYSalesValue" = f1."LYSalesValue",
-        "SalesUnit" = f1."SalesUnit",
-        "LYSalesUnit"= f1."LYSalesUnit",
-        "MarketValueSize"=f1."MarketValueSize",
-        "LYMarketValueSize" = f1."LYMarketValueSize",
-        "MarketUnitSize" = f1."MarketUnitSize",
-        "LYMarketUnitSize" = f1."LYMarketUnitSize"
-from "AreaMarketCycleData_1" f1
-where f."Cycle" = f1."Cycle" and f."ExternalAreaID" = f1."ExternalAreaID" and f."MarketName" = f1."MarketName" and f."ExternalProductID" = f1."ExternalProductID";  --Updated Rows        34680
-
-RAISE NOTICE 'AMCD Step2.2 - Attach values to Cross Join table done';
-
--- 2.3 Update market size data for no sales records
+-- 2.1 get market size data 
 drop table if exists "AreaMarketCycleData_size";
-create table "AreaMarketCycleData_size" as
+create table "AreaMarketCycleData_size" as 
 select
         "ExternalAreaID",
         "Cycle",
@@ -629,20 +599,46 @@ select
         max("MarketUnitSize") as "MarketUnitSize",
         max("LYMarketUnitSize") as "LYMarketUnitSize"
 from "AreaMarketCycleData_1" f1
-group by "ExternalAreaID","Cycle","MarketName"; --3327
+group by "ExternalAreaID","Cycle","MarketName"; --24888
 drop index if exists amcds_pk_idx;
 CREATE INDEX amcds_pk_idx ON "AreaMarketCycleData_size" USING btree ("ExternalAreaID", "MarketName", "Cycle");
 
-update "AreaMarketCycleData_2" f
-set
-        "MarketValueSize"=f1."MarketValueSize",
-        "LYMarketValueSize" = f1."LYMarketValueSize",
-        "MarketUnitSize" = f1."MarketUnitSize",
-        "LYMarketUnitSize" = f1."LYMarketUnitSize"
-from "AreaMarketCycleData_size" f1
-where f."Cycle" = f1."Cycle" and f."ExternalAreaID" = f1."ExternalAreaID" and f."MarketName" = f1."MarketName";  --34680
+-- 2.2 create Cross-join table and insert values
+drop table if exists "AreaMarketCycleData_2";
+create table "AreaMarketCycleData_2" as select * from "AreaMarketCycleData_1" where 1=2;
+INSERT INTO "AreaMarketCycleData_2" 
+select
+        cal."Cycle",
+        geo."ExternalAreaID",
+        max(geo."ExternalAreaName"),
+        max(geo."ExternalAreaName_EN"),
+        prod."MarketName",
+        prod."ExternalProductID",
+        max(prod."ExternalProductName"),
+        max(prod."ExternalProductName_EN"),
+        bool_or(prod."IsInternalProduct"),
+        max(prod."ProductID"),
+        max(prod."ProductName"),
+        max(prod."ProductName_EN"),
+        sum(f1."SalesValue") as "SalesValue",
+        sum(f1."LYSalesValue") as "LYSalesValue",
+        sum(f1."SalesUnit") as "SalesUnit",
+        sum(f1."LYSalesUnit") as "LYSalesUnit",
+        sum(amcds."MarketValueSize") as "MarketValueSize",
+        sum(amcds."LYMarketValueSize") as "LYMarketValueSize",
+        sum(amcds."MarketUnitSize") as "MarketUnitSize",
+        sum(amcds."LYMarketUnitSize") as "LYMarketUnitSize"
+from (select distinct "MarketName", "ExternalProductID", max("ExternalProductName") as "ExternalProductName", max("ExternalProductName_EN") as "ExternalProductName_EN", max("IsInternalProduct"::text)::bool as "IsInternalProduct", max("ProductID") as "ProductID", max("ProductName") as "ProductName", max("ProductName_EN") as "ProductName_EN" from "AreaMarketCycleData_1" group by "MarketName", "ExternalProductID") prod
+join (select distinct "Cycle" from "AreaMarketCycleData_1") cal on 1=1
+join (select distinct "ExternalAreaID", "ExternalAreaName", "ExternalAreaName_EN" from "AreaMarketCycleData_1") geo on 1=1
+left join "AreaMarketCycleData_1" f1 on geo."ExternalAreaID" = f1."ExternalAreaID" and prod."ExternalProductID" = f1."ExternalProductID" and prod."MarketName" = f1."MarketName" and cal."Cycle" = f1."Cycle"
+left join "AreaMarketCycleData_size" amcds on geo."ExternalAreaID" = amcds."ExternalAreaID" and prod."MarketName" = amcds."MarketName" and cal."Cycle" = amcds."Cycle"
+group by cal."Cycle", geo."ExternalAreaID", prod."MarketName", prod."ExternalProductID"
+;--232704 (303*24*32)
 
-insert into "AreaMarketCycleData"
+RAISE NOTICE 'AMCD Step2 - Create Cross Join table done';
+
+insert into "AreaMarketCycleData" 
 select
         "Cycle",
         "ExternalAreaID",
@@ -666,7 +662,11 @@ select
         "LYMarketUnitSize"
 from "AreaMarketCycleData_2";
 
-RAISE NOTICE 'AMCD Step2.3 - Update Size for AMCD done';
+drop table "AreaMarketCycleData_1";
+drop table "AreaMarketCycleData_2";
+drop table "AreaMarketCycleData_size";
+
+RAISE NOTICE 'AMCD refresh done';
 
 --Step3. Update AreaMarketMonthData
 drop table if exists AreaMarketR3MData;
@@ -680,15 +680,15 @@ SELECT c.month_text,
  amcd."MarketName" as MarketName,
  amcd."ExternalProductID" as ExternalProductID,
  MAX(amcd."ExternalProductName") as ExternalProductName,
- MAX(amcd."ExternalProductName_EN") as ExternalProductName_EN,
+ MAX(amcd."ExternalProductName_EN") as ExternalProductName_EN, 
  bool_or("IsInternalProduct") as IsInternalProduct,
  MAX(amcd."ProductID") as ProductID,
- MAX(amcd."ProductName") as ProductName,
+ MAX(amcd."ProductName") as ProductName, 
  MAX(amcd."ProductName_EN") as ProductName_EN,
  sum(amcd."SalesValue") AS rolling_3m_sales,
  sum(amcd."SalesUnit") AS rolling_3m_sales_unit
 FROM "AreaMarketCycleData" amcd
-JOIN dim_calendar c ON amcd."Cycle" between to_char(c.rolling_3m_start_date,'yyyymm') and to_char(c.rolling_3m_end_date,'yyyymm') and c.day_of_month_num = 1
+JOIN (select * from dim_calendar where day_of_month_num = 1) c ON to_date(amcd."Cycle",'yyyymm') between c.rolling_3m_start_date and c.rolling_3m_end_date
 GROUP BY c.month_text,
  amcd."MarketName",
  amcd."ExternalAreaID",
@@ -710,15 +710,15 @@ SELECT to_char(to_date(c.month_text,'yyyymm') + interval '3 month', 'yyyymm') as
  amcd."MarketName" as MarketName,
  amcd."ExternalProductID" as ExternalProductID,
  MAX(amcd."ExternalProductName") as ExternalProductName,
- MAX(amcd."ExternalProductName_EN") as ExternalProductName_EN,
+ MAX(amcd."ExternalProductName_EN") as ExternalProductName_EN, 
  bool_or("IsInternalProduct") as IsInternalProduct,
  MAX(amcd."ProductID") as ProductID,
- MAX(amcd."ProductName") as ProductName,
+ MAX(amcd."ProductName") as ProductName, 
  MAX(amcd."ProductName_EN") as ProductName_EN,
  sum(amcd."SalesValue") AS rolling_3m_sales,
  sum(amcd."SalesUnit") AS rolling_3m_sales_unit
 FROM "AreaMarketCycleData" amcd
-JOIN dim_calendar c ON amcd."Cycle" between to_char(c.rolling_3m_start_date,'yyyymm') and to_char(c.rolling_3m_end_date,'yyyymm') and c.day_of_month_num = 1
+JOIN (select * from dim_calendar where day_of_month_num = 1) c ON to_date(amcd."Cycle",'yyyymm') between c.rolling_3m_start_date and c.rolling_3m_end_date
 GROUP BY c.month_text,
  amcd."MarketName",
  amcd."ExternalAreaID",
@@ -738,6 +738,8 @@ from AreaMarketR3MData r3m
 left join "AreaMarketCycleData" lm on to_date(r3m.month_text, 'yyyymm') - interval '1 month' = to_date(lm."Cycle",'yyyymm') and r3m.MarketName=lm."MarketName" and r3m.ExternalAreaID=lm."ExternalAreaID" and r3m.ExternalProductID=lm."ExternalProductID"
 left join AreaMarketP3MData p3m on r3m.month_text=p3m.month_text and r3m.MarketName=p3m.MarketName and r3m.ExternalAreaID=p3m.ExternalAreaID and r3m.ExternalProductID=p3m.ExternalProductID; -- Updated Rows        43648
 
+RAISE NOTICE 'AMCD Step3 - AreaMarketMonthData done';
+
 --Step4. Update AreaMarketQuarterData
 drop table if exists AreaMarketQuarterSales;
 CREATE TEMP Table AreaMarketQuarterSales AS
@@ -750,10 +752,10 @@ SELECT C.QUARTER_TEXT,
  amcd."MarketName" as MarketName,
  amcd."ExternalProductID" as ExternalProductID,
  MAX(amcd."ExternalProductName") as ExternalProductName,
- MAX(amcd."ExternalProductName_EN") as ExternalProductName_EN,
+ MAX(amcd."ExternalProductName_EN") as ExternalProductName_EN, 
  bool_or("IsInternalProduct") as IsInternalProduct,
  MAX(amcd."ProductID") as ProductID,
- MAX(amcd."ProductName") as ProductName,
+ MAX(amcd."ProductName") as ProductName, 
  MAX(amcd."ProductName_EN") as ProductName_EN,
  SUM(amcd."SalesValue") AS sales_cq,
  SUM(amcd."SalesValue") / NULLIF(COUNT(DISTINCT amcd."Cycle"),0) AS avg_sales_cq,
@@ -769,7 +771,7 @@ order by amcd."MarketName",
  amcd."ExternalAreaID",
  amcd."ExternalProductID",
  C.QUARTER_TEXT; -- Updated Rows        13888
-
+ 
  drop table if exists AreaMarketLastQuarterSales;
 CREATE TEMP Table AreaMarketLastQuarterSales AS
 SELECT C.QUARTER_TEXT,
@@ -781,11 +783,11 @@ SELECT C.QUARTER_TEXT,
  amcd."MarketName" as MarketName,
  amcd."ExternalProductID" as ExternalProductID,
  MAX(amcd."ExternalProductName") as ExternalProductName,
- MAX(amcd."ExternalProductName_EN") as ExternalProductName_EN,
+ MAX(amcd."ExternalProductName_EN") as ExternalProductName_EN, 
  bool_or("IsInternalProduct") as IsInternalProduct,
  MAX(amcd."ProductID") as ProductID,
- MAX(amcd."ProductName") as ProductName,
- MAX(amcd."ProductName_EN") as ProductName_EN,
+ MAX(amcd."ProductName") as ProductName, 
+ MAX(amcd."ProductName_EN") as ProductName_EN, 
  SUM(amcd."SalesValue") AS sales_lq,
  SUM(amcd."SalesValue") / NULLIF(COUNT(DISTINCT amcd."Cycle"),0) AS avg_sales_lq,
  SUM(amcd."SalesUnit") AS sales_unit_lq,
@@ -800,23 +802,21 @@ order by amcd."MarketName",
  amcd."ExternalAreaID",
  amcd."ExternalProductID",
  C.QUARTER_TEXT;--Updated Rows        13888
-
+ 
 drop table if exists "AreaMarketQuarterData";
 CREATE Table "AreaMarketQuarterData" AS
 select cq.*, lq.sales_lq, lq.avg_sales_lq, lq.sales_unit_lq, lq.avg_sales_unit_lq
 from AreaMarketQuarterSales cq
-left join AreaMarketLastQuarterSales lq
-on cq.QUARTER_TEXT=lq.QUARTER_TEXT
-and cq.MarketName=lq.MarketName
-and cq.ExternalAreaID=lq.ExternalAreaID
+left join AreaMarketLastQuarterSales lq 
+on cq.QUARTER_TEXT=lq.QUARTER_TEXT 
+and cq.MarketName=lq.MarketName 
+and cq.ExternalAreaID=lq.ExternalAreaID 
 and cq.ExternalProductID=lq.ExternalProductID;
 -- Updated Rows 13888
 
+RAISE NOTICE 'AMCD Step4 - AreaMarketQuarterData done';
 
 -- 4. Drop internal tables
-drop table "AreaMarketCycleData_1";
-drop table "AreaMarketCycleData_size";
-
 alter table "AreaMarketCycleData" owner to nvs_user_dw;
 alter table "AreaMarketQuarterData" owner to nvs_user_dw;
 alter table "AreaMarketMonthData" owner to nvs_user_dw;
@@ -826,8 +826,6 @@ RAISE NOTICE 'AMCD Done, remember to VACUUM the table';
 end;
 $procedure$
 ;
-
-
 
 
 
@@ -953,8 +951,6 @@ $procedure$
 ;
 
 
-
-
 -- DROP PROCEDURE public.proc_cleanse_insmarketcycledata();
 
 CREATE OR REPLACE PROCEDURE public.proc_cleanse_insmarketcycledata()
@@ -965,7 +961,8 @@ begin
 --==========================================================================================================================
 -- InsMarketCycleData cleansing
 --==========================================================================================================================
-RAISE NOTICE 'InsMarketCycleData started';
+RAISE NOTICE 'InsMarketCycleData started %', clock_timestamp();
+
 
 drop table if exists "InsMarketCycleData_arc" CASCADE;
 create table "InsMarketCycleData_arc" as select * from "InsMarketCycleData";
@@ -1019,12 +1016,13 @@ select
     lymarketunitsize::numeric(28,8) as "LYMarketUnitSize"
 from "insmarketcycledata_raw" imcdr
 left join "ProductMapping" pm on imcdr.externalproductid = pm."CPA_ProductID" and upper(imcdr.marketname) = pm."Market"
-where upper(imcdr.marketname) in (select distinct p."PrimaryMarket" from "OrgCycle" oc
-                join "InsTrtyProductCycleData" itpcd on oc."RepTerritoryID" = itpcd."RepTerritoryCode" and oc."Cycle" = (select max("Cycle") from "OrgCycle" oc2)
-                join "Product" p on itpcd."ProductID" = p."ProductID"
-                where p."PrimaryMarket" is not null); --3,555,000
+where upper(imcdr.marketname) in (select distinct pm."Market"  from "OrgCycle" oc 
+            join "InsTrtyProductCycleData" itpcd on oc."RepTerritoryID" = itpcd."RepTerritoryCode" and oc."Cycle" = (select max("Cycle") from "OrgCycle" oc2)
+            join "Product" p on itpcd."ProductID" = p."ProductID"
+            join "ProductMapping" pm on p."BrandID" = pm."ProductID" 
+            where pm."Market" is not null); --Updated Rows        8,259,783
 
-RAISE NOTICE 'IMCD Step1 - Standardize columns done';
+RAISE NOTICE 'IMCD Step1 - Standardize columns done %', clock_timestamp();
 
 -- 2. Calculate Market Size columns
 drop table if exists "InsMarketCycleData_2";
@@ -1045,42 +1043,21 @@ select
         sum("LYSalesValue")::numeric(28,8) as "LYSalesValue",
         sum("SalesUnit")::numeric(28,8) as "SalesUnit",
         sum("LYSalesUnit")::numeric(28,8) as "LYSalesUnit",
-        sum(sum(coalesce("SalesValue",0)))over(partition by "InstitutionID", "MarketName", "Cycle")::numeric(28,8) as "MarketValueSize",
-        sum(sum(coalesce("LYSalesValue",0)))over(partition by "InstitutionID", "MarketName", "Cycle")::numeric(28,8) as "LYMarketValueSize",
-        sum(sum(coalesce("SalesUnit",0)))over(partition by "InstitutionID", "MarketName", "Cycle")::numeric(28,8) as "MarketUnitSize",
+        sum(sum(coalesce("SalesValue",0)))over(partition by "InstitutionID", "MarketName", "Cycle")::numeric(28,8) as "MarketValueSize", 
+        sum(sum(coalesce("LYSalesValue",0)))over(partition by "InstitutionID", "MarketName", "Cycle")::numeric(28,8) as "LYMarketValueSize", 
+        sum(sum(coalesce("SalesUnit",0)))over(partition by "InstitutionID", "MarketName", "Cycle")::numeric(28,8) as "MarketUnitSize", 
         sum(sum(coalesce("LYSalesUnit",0)))over(partition by "InstitutionID", "MarketName", "Cycle")::numeric(28,8) as "LYMarketUnitSize"
 from "InsMarketCycleData_1"
-group by "InstitutionID", "ExternalProductID", "MarketName", "Cycle"; --3,555,000
+group by "InstitutionID", "ExternalProductID", "MarketName", "Cycle"; --8,259,783
 
 drop index if exists imcd2_pk_idx;
 CREATE INDEX imcd2_pk_idx ON "InsMarketCycleData_2" USING btree ("InstitutionID", "ExternalProductID", "MarketName", "Cycle");
-RAISE NOTICE 'IMCD Step2 - Calculate Market Size done';
+RAISE NOTICE 'IMCD Step2 - Calculate Market Size done %', clock_timestamp();
 
 -- 3. Create a Cartesian table with the CROSS JOIN of ins+prod_mkt+cycle
-drop table if exists "InsMarketCycleData_3";
-create table "InsMarketCycleData_3" as select * from "InsMarketCycleData_2" where 1=2;
--- 3.1 insert Cross-join result as a framework
-insert into "InsMarketCycleData_3" ("Cycle", "InstitutionID", "InstitutionName", "MarketName", "ExternalProductID", "ExternalProductName", "ExternalProductName_EN", "IsInternalProduct", "ProductID", "ProductName", "ProductName_EN")
-select "Cycle", "InstitutionID", "InstitutionName", "MarketName", "ExternalProductID", "ExternalProductName", "ExternalProductName_EN", "IsInternalProduct", "ProductID", "ProductName", "ProductName_EN"
-from
-(select distinct "MarketName", "ExternalProductID", "ExternalProductName", "ExternalProductName_EN", "IsInternalProduct", "ProductID", "ProductName", "ProductName_EN" from "InsMarketCycleData_2") prod
-join (select distinct "InstitutionID", "InstitutionName" from "InsMarketCycleData_2") ins on 1=1
-join (select distinct "Cycle" from "InsMarketCycleData_2") cycle on 1=1;--3,951,990
-
-drop index if exists imcd3_pk_idx;
-CREATE INDEX imcd3_pk_idx ON "InsMarketCycleData_3" USING btree ("InstitutionID", "ExternalProductID", "MarketName", "Cycle");
-RAISE NOTICE 'IMCD Step3.1 - Create Cross Join table done';
-
--- 3.2 Attach values to the Cartesian table
-update "InsMarketCycleData_3" f
-set "SalesValue" = f2."SalesValue", "LYSalesValue" = f2."LYSalesValue", "SalesUnit" = f2."SalesUnit", "LYSalesUnit" = f2."LYSalesUnit"
-from "InsMarketCycleData_2" f2
-where f."InstitutionID" = f2."InstitutionID" and f."ExternalProductID" = f2."ExternalProductID" and f."MarketName" = f2."MarketName" and f."Cycle" = f2."Cycle";  --3,555,000
-RAISE NOTICE 'IMCD Step3.2 - Attach values to Cross Join table done';
-
--- 3.3 Update market size data for no sales records
+-- 3.1 get market size data
 drop table if exists "InsMarketCycleData_size";
-create table "InsMarketCycleData_size" as
+create table "InsMarketCycleData_size" as 
 select
         "InstitutionID",
         "MarketName",
@@ -1090,47 +1067,54 @@ select
         max("MarketUnitSize") as "MarketUnitSize",
         max("LYMarketUnitSize") as "LYMarketUnitSize"
 from "InsMarketCycleData_2"
-group by "InstitutionID", "MarketName", "Cycle"; --96462 -> 132282
+group by "InstitutionID", "MarketName", "Cycle"; --397,440
 drop index if exists imcds_pk_idx;
 CREATE INDEX imcds_pk_idx ON "InsMarketCycleData_size" USING btree ("InstitutionID", "MarketName", "Cycle");
+RAISE NOTICE 'IMCD Step3.1 - InsMarketCycleData_size created %', clock_timestamp();
 
-update "InsMarketCycleData_3" f
-set
-        "MarketValueSize" = imcds."MarketValueSize",
-        "LYMarketValueSize" = imcds."LYMarketValueSize",
-        "MarketUnitSize" = imcds."MarketUnitSize",
-        "LYMarketUnitSize" = imcds."LYMarketUnitSize"
-from "InsMarketCycleData_size" imcds
-where f."InstitutionID" = imcds."InstitutionID" and f."MarketName" = imcds."MarketName" and f."Cycle" = imcds."Cycle";  --Updated Rows        3,555,000
-
+-- 3.2 create Cross-join table and insert values
 insert into "InsMarketCycleData"
 select
-        "Cycle",
-        "InstitutionID",
-        "InstitutionName",
-        "MarketName",
-        "ExternalProductID",
-        "ExternalProductName",
-        "ExternalProductName_EN",
-        "IsInternalProduct",
-        "ProductID",
-        "ProductName",
-        "ProductName_EN",
-        "SalesValue",
-        "LYSalesValue",
-        "SalesUnit",
-        "LYSalesUnit",
-        "MarketValueSize",
-        "LYMarketValueSize",
-        "MarketUnitSize",
-        "LYMarketUnitSize"
-from "InsMarketCycleData_3";--3,951,990
+        cycle."Cycle",
+        ins."InstitutionID",
+        ins."InstitutionName",
+        prod."MarketName",
+        prod."ExternalProductID",
+        prod."ExternalProductName",
+        prod."ExternalProductName_EN",
+        prod."IsInternalProduct",
+        prod."ProductID",
+        prod."ProductName",
+        prod."ProductName_EN",
+        null as "SalesValue",
+        null as "LYSalesValue",
+        null as "SalesUnit",
+        null as "LYSalesUnit",
+        imcds."MarketValueSize" as "MarketValueSize",
+        imcds."LYMarketValueSize" as "LYMarketValueSize",
+        imcds."MarketUnitSize" as "MarketUnitSize",
+        imcds."LYMarketUnitSize" as "LYMarketUnitSize"
+from
+(select distinct "MarketName", "ExternalProductID", "ExternalProductName", "ExternalProductName_EN", "IsInternalProduct", "ProductID", "ProductName", "ProductName_EN" from "InsMarketCycleData_2") prod
+join (select distinct "InstitutionID", "InstitutionName" from "InsMarketCycleData_2") ins on 1=1
+join (select distinct "Cycle" from "InsMarketCycleData_2") cycle on 1=1
+left join "InsMarketCycleData_size" imcds on ins."InstitutionID" = imcds."InstitutionID" and prod."MarketName" = imcds."MarketName" and cycle."Cycle" = imcds."Cycle"
+;--Updated Rows        9048453
+
+drop index if exists imcd_pk_idx;
+CREATE INDEX imcd_pk_idx ON "InsMarketCycleData" USING btree ("InstitutionID", "ExternalProductID", "MarketName", "Cycle");
+
+update "InsMarketCycleData" f
+set "SalesValue" = f2."SalesValue", "LYSalesValue" = f2."LYSalesValue", "SalesUnit" = f2."SalesUnit", "LYSalesUnit" = f2."LYSalesUnit"
+from "InsMarketCycleData_2" f2
+where f."InstitutionID" = f2."InstitutionID" and f."ExternalProductID" = f2."ExternalProductID" and f."MarketName" = f2."MarketName" and f."Cycle" = f2."Cycle";  
 
 drop table "InsMarketCycleData_1";
 drop table "InsMarketCycleData_2";
 drop table "InsMarketCycleData_size";
 
-RAISE NOTICE 'IMCD Step3.3 - Update Size for IMCD done';
+RAISE NOTICE 'IMCD Step3 - Create Cross Join table done%', clock_timestamp();
+RAISE NOTICE 'IMCD refresh done%', statement_timestamp();
 
 -- 4. Create IMMD & IMQD
 drop table if exists insmarketr3mdata;
@@ -1143,15 +1127,15 @@ SELECT c.month_text,
  imcd."MarketName" as MarketName,
  imcd."ExternalProductID" as ExternalProductID,
  max(imcd."ExternalProductName") as ExternalProductName,
- max(imcd."ExternalProductName_EN") as ExternalProductName_EN,
+ max(imcd."ExternalProductName_EN") as ExternalProductName_EN, 
  bool_or("IsInternalProduct") as IsInternalProduct,
  max(imcd."ProductID") as ProductID,
- max(imcd."ProductName") as ProductName,
+ max(imcd."ProductName") as ProductName, 
  max(imcd."ProductName_EN") as ProductName_EN,
  sum(imcd."SalesValue") AS rolling_3m_sales,
  sum(imcd."SalesUnit") AS rolling_3m_sales_unit
 FROM "InsMarketCycleData" imcd
-JOIN dim_calendar c ON imcd."Cycle" between to_char(c.rolling_3m_start_date,'yyyymm') and to_char(c.rolling_3m_end_date,'yyyymm') and c.day_of_month_num = 1
+JOIN (select * from dim_calendar where day_of_month_num = 1) c ON to_date(imcd."Cycle",'yyyymm') between c.rolling_3m_start_date and c.rolling_3m_end_date
 GROUP BY c.month_text,
  imcd."MarketName",
  imcd."InstitutionID",
@@ -1159,7 +1143,7 @@ GROUP BY c.month_text,
 order by imcd."MarketName",
  imcd."InstitutionID",
  imcd."ExternalProductID",
- c.month_text; --Updated Rows        4391100
+ c.month_text;
 
 drop table if exists insmarketp3mdata;
 CREATE Table insmarketp3mdata AS
@@ -1171,15 +1155,15 @@ SELECT to_char(to_date(c.month_text,'yyyymm') + interval '3 month', 'yyyymm') as
  imcd."MarketName" as MarketName,
  imcd."ExternalProductID" as ExternalProductID,
  max(imcd."ExternalProductName") as ExternalProductName,
- max(imcd."ExternalProductName_EN") as ExternalProductName_EN,
+ max(imcd."ExternalProductName_EN") as ExternalProductName_EN, 
  bool_or("IsInternalProduct") as IsInternalProduct,
  max(imcd."ProductID") as ProductID,
- max(imcd."ProductName") as ProductName,
+ max(imcd."ProductName") as ProductName, 
  max(imcd."ProductName_EN") as ProductName_EN,
  sum(imcd."SalesValue") AS rolling_3m_sales,
  sum(imcd."SalesUnit") AS rolling_3m_sales_unit
 FROM "InsMarketCycleData" imcd
-JOIN dim_calendar c ON imcd."Cycle" between to_char(c.rolling_3m_start_date,'yyyymm') and to_char(c.rolling_3m_end_date,'yyyymm') and c.day_of_month_num = 1
+JOIN (select * from dim_calendar where day_of_month_num = 1) c ON to_date(imcd."Cycle",'yyyymm') between c.rolling_3m_start_date and c.rolling_3m_end_date
 GROUP BY c.month_text,
  imcd."MarketName",
  imcd."InstitutionID",
@@ -1187,7 +1171,7 @@ GROUP BY c.month_text,
 order by imcd."MarketName",
  imcd."InstitutionID",
  imcd."ExternalProductID",
- c.month_text; --Updated Rows        4391100
+ c.month_text; 
 
 CREATE INDEX insmarketr3mdata_idx ON insmarketr3mdata (month_text,MarketName,InstitutionID,ExternalProductID);
 CREATE INDEX insmarketp3mdata_idx ON insmarketp3mdata (month_text,MarketName,InstitutionID,ExternalProductID);
@@ -1197,7 +1181,7 @@ CREATE Table "InsMarketMonthData" AS
 select r3m.*, p3m.rolling_3m_sales as pass_3m_sales, p3m.rolling_3m_sales_unit as pass_3m_sales_unit, lm."SalesValue" as lm_sales, lm."SalesUnit" as lm_sales_unit
 from insmarketr3mdata r3m
 left join "InsMarketCycleData" lm on to_date(r3m.month_text, 'yyyymm') - interval '1 month' = to_date(lm."Cycle",'yyyymm') and r3m.MarketName=lm."MarketName" and r3m.InstitutionID=lm."InstitutionID" and r3m.ExternalProductID=lm."ExternalProductID"
-left join insmarketp3mdata p3m on r3m.month_text=p3m.month_text and r3m.MarketName=p3m.MarketName and r3m.InstitutionID=p3m.InstitutionID and r3m.ExternalProductID=p3m.ExternalProductID; -- Updated Rows        4391100
+left join insmarketp3mdata p3m on r3m.month_text=p3m.month_text and r3m.MarketName=p3m.MarketName and r3m.InstitutionID=p3m.InstitutionID and r3m.ExternalProductID=p3m.ExternalProductID; 
 
 --Step5. Update AreaMarketQuarterData
 drop table if exists insmarketquartersales;
@@ -1210,10 +1194,10 @@ SELECT c.quarter_text,
  imcd."MarketName" as MarketName,
  imcd."ExternalProductID" as ExternalProductID,
  max(imcd."ExternalProductName") as ExternalProductName,
- max(imcd."ExternalProductName_EN") as ExternalProductName_EN,
+ max(imcd."ExternalProductName_EN") as ExternalProductName_EN, 
  bool_or("IsInternalProduct") as IsInternalProduct,
  max(imcd."ProductID") as ProductID,
- max(imcd."ProductName") as ProductName,
+ max(imcd."ProductName") as ProductName, 
  max(imcd."ProductName_EN") as ProductName_EN,
  sum(imcd."SalesValue") as sales_cq,
  sum(imcd."SalesValue") / nullif(count(distinct imcd."Cycle"),0) as avg_sales_cq,
@@ -1228,8 +1212,8 @@ GROUP BY c.quarter_text,
 order by imcd."MarketName",
  imcd."InstitutionID",
  imcd."ExternalProductID",
- c.quarter_text; -- Updated Rows        1317330
-
+ c.quarter_text; 
+ 
 drop table if exists insmarketlastquartersales;
 CREATE Table insmarketlastquartersales AS
 SELECT C.QUARTER_TEXT,
@@ -1240,10 +1224,10 @@ SELECT C.QUARTER_TEXT,
  imcd."MarketName" as MarketName,
  imcd."ExternalProductID" as ExternalProductID,
  max(imcd."ExternalProductName") as ExternalProductName,
- max(imcd."ExternalProductName_EN") as ExternalProductName_EN,
+ max(imcd."ExternalProductName_EN") as ExternalProductName_EN, 
  bool_or("IsInternalProduct") as IsInternalProduct,
  max(imcd."ProductID") as ProductID,
- max(imcd."ProductName") as ProductName,
+ max(imcd."ProductName") as ProductName, 
  max(imcd."ProductName_EN") as ProductName_EN,
  sum(imcd."SalesValue") as sales_lq,
  sum(imcd."SalesValue") / nullif(count(distinct imcd."Cycle"),0) as avg_sales_lq,
@@ -1258,15 +1242,15 @@ GROUP BY c.quarter_text,
 order by imcd."MarketName",
  imcd."InstitutionID",
  imcd."ExternalProductID",
- c.quarter_text;--Updated Rows        1317330
-
+ c.quarter_text;
+ 
 drop table if exists "InsMarketQuarterData";
 CREATE Table "InsMarketQuarterData" AS
 select cq.*, lq.sales_lq, lq.avg_sales_lq, lq.sales_unit_lq, lq.avg_sales_unit_lq
 from insmarketquartersales cq
-left join insmarketlastquartersales lq on cq.quarter_text=lq.quarter_text and cq.marketname=lq.marketname and cq.institutionid=lq.institutionid and cq.externalproductid=lq.externalproductid;--Updated Rows        1317330
+left join insmarketlastquartersales lq on cq.quarter_text=lq.quarter_text and cq.marketname=lq.marketname and cq.institutionid=lq.institutionid and cq.externalproductid=lq.externalproductid;
 
-RAISE NOTICE 'IMCD Step4 - IMMD, IMQD created';
+RAISE NOTICE 'IMCD Step4 - IMMD, IMQD created%', clock_timestamp(); 
 
 -- 4. Drop internal tables
 drop table insmarketr3mdata;
@@ -1278,13 +1262,12 @@ alter table "InsMarketCycleData" owner to nvs_user_dw;
 alter table "InsMarketQuarterData" owner to nvs_user_dw;
 alter table "InsMarketMonthData" owner to nvs_user_dw;
 
-RAISE NOTICE 'IMCD Done, remember to VACUUM the table';
+RAISE NOTICE 'remember to VACUUM the table%', clock_timestamp();
 
 
 end;
 $procedure$
 ;
-
 
 
 -- DROP PROCEDURE public.proc_cleanse_instrtyproductchannelcycledata();
@@ -1323,9 +1306,9 @@ CREATE TABLE "InsTrtyProductChannelCycleData" (
 CREATE INDEX itpccd_pk_idx ON public."InsTrtyProductChannelCycleData" USING btree ("InsID", "RepTerritoryCode", "ProductID", "Cycle", "SubInsType");
 CREATE INDEX itpccd_pk_idx2 ON public."InsTrtyProductChannelCycleData" USING btree ("InsID", "RepTerritoryCode", "ProductID", "Cycle");
 
--- Step1. Standardize column names and column type
+-- Step1. Standardize column names and column type 
 drop table if exists "InsTrtyProductChannelCycleData_1";
-create table "InsTrtyProductChannelCycleData_1" as
+create table "InsTrtyProductChannelCycleData_1" as 
 select
         repterritoryid as "RepTerritoryCode",
         "cycle" as "Cycle",
@@ -1345,8 +1328,7 @@ select
 from instrtyproductchannelcycledata_raw itpccd
 join "Product" p on itpccd.productid = p."ProductID"
 join "OrgCycle" oc on itpccd.repterritoryid = oc."RepTerritoryID" and oc."Cycle" =(select max("cycle") from instrtyproductcycledata_raw where salesvalue>0)
-where oc."BUHTerritoryName" in ('CRMBU', 'OTNBU')
-and itpccd.subinstype is not null
+where itpccd.subinstype is not null
 group by insid, subinstype, repterritoryid, p."ProductID", cycle;--677,348
 
 RAISE NOTICE 'ITPCCD Step1 - Standardize column Done';
@@ -1354,7 +1336,7 @@ RAISE NOTICE 'ITPCCD Step1 - Standardize column Done';
 -- Step2. Create cross-join table
 drop table if exists "InsTrtyProductChannelCycleData_2";
 create table "InsTrtyProductChannelCycleData_2" as select * from "InsTrtyProductChannelCycleData_1" where 1=2;
-insert into "InsTrtyProductChannelCycleData_2" ("RepTerritoryCode", "Cycle", "SubInsID", "SubInsName", "SubInsType", "InsID", "InsName", "ProductID", "ProductName", "ProductName_EN", "Franchise")
+insert into "InsTrtyProductChannelCycleData_2" ("RepTerritoryCode", "Cycle", "SubInsID", "SubInsName", "SubInsType", "InsID", "InsName", "ProductID", "ProductName", "ProductName_EN", "Franchise") 
 select
         "RepTerritoryCode",
         "Cycle",
@@ -1371,7 +1353,7 @@ from (select distinct "RepTerritoryCode", "Cycle", "InsID", "InsName", "ProductI
 join (select distinct "SubInsType" from "InsTrtyProductChannelCycleData_1") ch on 1=1;
 --Updated Rows        2,668,215
 
--- Step2.1 Attach values to the cross-join table
+-- Step2.1 Attach values to the cross-join table 
 update "InsTrtyProductChannelCycleData_2" f
 set
         "SalesValue" = f1."SalesValue",
@@ -1384,7 +1366,7 @@ where f."InsID" = f1."InsID" and f."RepTerritoryCode" = f1."RepTerritoryCode" an
 -- Step2.2 Drop internal tables
 drop index if exists itpccd_pk_idx;
 drop index if exists itpccd_pk_idx2;
-INSERT INTO "InsTrtyProductChannelCycleData" ("RepTerritoryCode", "Cycle", "SubInsID", "SubInsName", "SubInsType", "InsID", "InsName", "ProductID", "ProductName", "ProductName_EN", "Franchise", "SalesValue", "LYSalesValue", "SalesUnit", "LYSalesUnit")
+INSERT INTO "InsTrtyProductChannelCycleData" ("RepTerritoryCode", "Cycle", "SubInsID", "SubInsName", "SubInsType", "InsID", "InsName", "ProductID", "ProductName", "ProductName_EN", "Franchise", "SalesValue", "LYSalesValue", "SalesUnit", "LYSalesUnit") 
 select * from "InsTrtyProductChannelCycleData_2";--Updated Rows        2668215
 create index itpccd_pk_idx on public."InsTrtyProductChannelCycleData" ("InsID","RepTerritoryCode","ProductID","Cycle","SubInsType");
 create index itpccd_pk_idx2 on public."InsTrtyProductChannelCycleData" ("InsID","RepTerritoryCode","ProductID","Cycle");
@@ -1403,12 +1385,12 @@ SELECT C.QUARTER_TEXT,
         ITPCD."RepTerritoryCode" as RepTerritoryCode,
         ITPCD."ProductID" as ProductID,
         MAX(ITPCD."ProductName") as ProductName,
-        MAX(ITPCD."ProductName_EN") as ProductName_EN,
-        round(sum(itpccd."SalesValue"),2) as sales_cq,
-        round(sum(itpccd."SalesValue") / nullif(count(distinct itpccd."Cycle"),0),2) AS avg_sales_cq,
-        round(sum(itpcd."SalesValue")/nullif(count(distinct itpccd."SubInsType"),0),2) as sales_xchannel_cq
+        MAX(ITPCD."ProductName_EN") as ProductName_EN,        
+        sum(itpccd."SalesValue") as sales_cq,
+        sum(itpccd."SalesValue") / nullif(count(distinct itpccd."Cycle"),0) AS avg_sales_cq,
+        sum(itpcd."SalesValue")/nullif(count(distinct itpccd."SubInsType"),0) as sales_xchannel_cq
 from "InsTrtyProductCycleData" itpcd
-join "InsTrtyProductChannelCycleData" itpccd on itpccd."InsID" = itpcd."InsID" and itpccd."RepTerritoryCode" = itpcd."RepTerritoryCode" and itpccd."ProductID" =itpcd."ProductID" and itpccd."Cycle" =itpcd."Cycle"
+join "InsTrtyProductChannelCycleData" itpccd on itpccd."InsID" = itpcd."InsID" and itpccd."RepTerritoryCode" = itpcd."RepTerritoryCode" and itpccd."ProductID" =itpcd."ProductID" and itpccd."Cycle" =itpcd."Cycle" 
 join dim_calendar c ON itpcd."Cycle" = c.MONTH_TEXT and c.DAY_OF_MONTH_NUM = 1
 GROUP BY C.QUARTER_TEXT,
         itpccd."SubInsType",
@@ -1432,12 +1414,12 @@ SELECT C.QUARTER_TEXT,
         ITPCD."RepTerritoryCode" as RepTerritoryCode,
         ITPCD."ProductID" as ProductID,
         MAX(ITPCD."ProductName") as ProductName,
-        MAX(ITPCD."ProductName_EN") as ProductName_EN,
-        round(sum(itpccd."SalesValue"),2) AS sales_lq,
-        round(sum(itpccd."SalesValue") / nullif(count(distinct itpccd."Cycle"),0),2) AS avg_sales_lq,
-        round(sum(itpcd."SalesValue")/nullif(count(distinct itpccd."SubInsType"),0),2) as sales_xchannel_lq
+        MAX(ITPCD."ProductName_EN") as ProductName_EN,        
+        sum(itpccd."SalesValue") AS sales_lq,
+        sum(itpccd."SalesValue") / nullif(count(distinct itpccd."Cycle"),0) AS avg_sales_lq,
+        sum(itpcd."SalesValue")/nullif(count(distinct itpccd."SubInsType"),0) as sales_xchannel_lq
 from "InsTrtyProductCycleData" itpcd
-join "InsTrtyProductChannelCycleData" itpccd on itpccd."InsID" = itpcd."InsID" and itpccd."RepTerritoryCode" = itpcd."RepTerritoryCode" and itpccd."ProductID" =itpcd."ProductID" and itpccd."Cycle" =itpcd."Cycle"
+join "InsTrtyProductChannelCycleData" itpccd on itpccd."InsID" = itpcd."InsID" and itpccd."RepTerritoryCode" = itpcd."RepTerritoryCode" and itpccd."ProductID" =itpcd."ProductID" and itpccd."Cycle" =itpcd."Cycle" 
 JOIN DIM_CALENDAR C ON to_date(ITPCD."Cycle",'yyyymm') = to_date(C.MONTH_TEXT,'yyyymm')-interval '3 month' and C.DAY_OF_MONTH_NUM = 1
 GROUP BY C.QUARTER_TEXT,
         itpccd."SubInsType",
@@ -1454,10 +1436,10 @@ drop table if exists "InsTrtyProductQuarterChannelData";
 CREATE Table "InsTrtyProductQuarterChannelData" AS
 select cq.*, lq.sales_lq, lq.avg_sales_lq, lq.sales_xchannel_lq
 from InsTrtyProductQuarterChannelSales cq
-left join InsTrtyProductLastQuarterChannelSales lq
-on cq.QUARTER_TEXT=lq.QUARTER_TEXT
-and cq.InsID=lq.InsID
-and cq.RepTerritoryCode=lq.RepTerritoryCode
+left join InsTrtyProductLastQuarterChannelSales lq 
+on cq.QUARTER_TEXT=lq.QUARTER_TEXT 
+and cq.InsID=lq.InsID 
+and cq.RepTerritoryCode=lq.RepTerritoryCode 
 and cq.ProductID=lq.ProductID
 and cq.sales_channel = lq.sales_channel;
 -- 295043
@@ -1474,12 +1456,12 @@ SELECT itpcd."Cycle" as month_text,
         ITPCD."RepTerritoryCode" as RepTerritoryCode,
         ITPCD."ProductID" as ProductID,
         MAX(ITPCD."ProductName") as ProductName,
-        MAX(ITPCD."ProductName_EN") as ProductName_EN,
-        round(sum(itpccd."SalesValue"),2) as sales_cm,
-        round(sum(itpccd."SalesValue") / nullif(count(distinct itpccd."Cycle"),0),2) AS avg_sales_cm,
-        round(sum(itpcd."SalesValue")/nullif(count(distinct itpccd."SubInsType"),0),2) as sales_xchannel_cm
+        MAX(ITPCD."ProductName_EN") as ProductName_EN,        
+        sum(itpccd."SalesValue") as sales_cm,
+        sum(itpccd."SalesValue") / nullif(count(distinct itpccd."Cycle"),0) AS avg_sales_cm,
+        sum(itpcd."SalesValue")/nullif(count(distinct itpccd."SubInsType"),0) as sales_xchannel_cm
 from "InsTrtyProductCycleData" itpcd
-join "InsTrtyProductChannelCycleData" itpccd on itpccd."InsID" = itpcd."InsID" and itpccd."RepTerritoryCode" = itpcd."RepTerritoryCode" and itpccd."ProductID" =itpcd."ProductID" and itpccd."Cycle" =itpcd."Cycle"
+join "InsTrtyProductChannelCycleData" itpccd on itpccd."InsID" = itpcd."InsID" and itpccd."RepTerritoryCode" = itpcd."RepTerritoryCode" and itpccd."ProductID" =itpcd."ProductID" and itpccd."Cycle" =itpcd."Cycle" 
 GROUP BY itpcd."Cycle",
         itpccd."SubInsType",
         ITPCD."InsID",
@@ -1500,12 +1482,12 @@ SELECT c.month_text,
         ITPCD."RepTerritoryCode" as RepTerritoryCode,
         ITPCD."ProductID" as ProductID,
         MAX(ITPCD."ProductName") as ProductName,
-        MAX(ITPCD."ProductName_EN") as ProductName_EN,
-        round(sum(itpccd."SalesValue"),2) AS sales_lm,
-        round(sum(itpccd."SalesValue") / nullif(count(distinct itpccd."Cycle"),0),2) AS avg_sales_lm,
-        round(sum(itpcd."SalesValue")/nullif(count(distinct itpccd."SubInsType"),0),2) as sales_xchannel_lm
+        MAX(ITPCD."ProductName_EN") as ProductName_EN,        
+        sum(itpccd."SalesValue") AS sales_lm,
+        sum(itpccd."SalesValue") / nullif(count(distinct itpccd."Cycle"),0) AS avg_sales_lm,
+        sum(itpcd."SalesValue")/nullif(count(distinct itpccd."SubInsType"),0) as sales_xchannel_lm
 from "InsTrtyProductCycleData" itpcd
-join "InsTrtyProductChannelCycleData" itpccd on itpccd."InsID" = itpcd."InsID" and itpccd."RepTerritoryCode" = itpcd."RepTerritoryCode" and itpccd."ProductID" =itpcd."ProductID" and itpccd."Cycle" =itpcd."Cycle"
+join "InsTrtyProductChannelCycleData" itpccd on itpccd."InsID" = itpcd."InsID" and itpccd."RepTerritoryCode" = itpcd."RepTerritoryCode" and itpccd."ProductID" =itpcd."ProductID" and itpccd."Cycle" =itpcd."Cycle" 
 join dim_calendar c on to_date(itpcd."Cycle",'yyyymm') = to_date(c.month_text,'yyyymm')-interval '1 month' and c.day_of_month_num = 1
 GROUP BY c.month_text,
         itpccd."SubInsType",
@@ -1523,9 +1505,9 @@ CREATE Table "InsTrtyProductMonthChannelData" AS
 select cm.*, lm.sales_lm, lm.avg_sales_lm, lm.sales_xchannel_lm
 from InsTrtyProductMonthChannelSales cm
 left join InsTrtyProductLastMonthChannelSales lm
-on cm.month_text=lm.month_text
-and cm.InsID=lm.InsID
-and cm.RepTerritoryCode=lm.RepTerritoryCode
+on cm.month_text=lm.month_text 
+and cm.InsID=lm.InsID 
+and cm.RepTerritoryCode=lm.RepTerritoryCode 
 and cm.ProductID=lm.ProductID
 and cm.sales_channel = lm.sales_channel;
 -- 774998
@@ -1547,10 +1529,6 @@ $procedure$
 ;
 
 
-
-
-
-
 -- DROP PROCEDURE public.proc_cleanse_instrtyproductcycledata();
 
 CREATE OR REPLACE PROCEDURE public.proc_cleanse_instrtyproductcycledata()
@@ -1565,8 +1543,10 @@ RAISE NOTICE 'InsTrtyProductCycleData cleansing started';
 
 drop table if exists "InsTrtyProductCycleData_arc" CASCADE;
 create table "InsTrtyProductCycleData_arc" as select * from "InsTrtyProductCycleData";
-DROP TABLE "InsTrtyProductCycleData";
+drop table if exists "InsTrtyProductCycleTarget_arc" CASCADE;
+create table "InsTrtyProductCycleTarget_arc" as select * from "InsTrtyProductCycleTarget";
 
+DROP TABLE "InsTrtyProductCycleData";
 CREATE TABLE "InsTrtyProductCycleData" (
         "RepTerritoryCode" varchar(50) NULL,
         "Cycle" varchar(20) NULL,
@@ -1584,6 +1564,20 @@ CREATE TABLE "InsTrtyProductCycleData" (
         "FTE" numeric(28, 8) NULL
 );
 CREATE INDEX instrtyproductcycledata_insid_idx ON public."InsTrtyProductCycleData" USING btree ("InsID", "RepTerritoryCode", "ProductID", "Cycle");
+
+DROP TABLE "InsTrtyProductCycleTarget";
+CREATE TABLE "InsTrtyProductCycleTarget" (
+        "RepTerritoryCode" varchar(50) NULL,
+        "Cycle" varchar(20) NULL,
+        "InsID" varchar(20) NULL,
+        "InsName" varchar(100) NULL,
+        "ProductID" varchar(20) NULL,
+        "ProductName" varchar(100) NULL,
+        "ProductName_EN" varchar(100) NULL,
+        "TargetValue" numeric(28, 8) NULL,
+        "TargetUnit" numeric(28, 8) NULL
+);
+CREATE INDEX instrtyproductcycletarget_insid_idx ON public."InsTrtyProductCycleTarget" USING btree ("InsID", "RepTerritoryCode", "ProductID", "Cycle");
 
 -- Step1. Standardize column names and calculate MarketSize
 insert into "InsTrtyProductCycleData" ("RepTerritoryCode", "Cycle", "InsID", "InsName", "ProductID", "ProductName", "ProductName_EN", "TargetValue", "SalesValue", "LYSalesValue", "TargetUnit", "SalesUnit", "LYSalesUnit", "FTE")
@@ -1605,63 +1599,78 @@ select
 from instrtyproductcycledata_raw itpcd
 join "Product" p on itpcd.productid = p."ProductID"
 join "OrgCycle" oc on itpcd.repterritoryid = oc."RepTerritoryID" and oc."Cycle" =(select max("cycle") from "instrtyproductcycledata_raw" where salesvalue>0)
-where oc."BUHTerritoryName" in ('CRMBU', 'OTNBU')
 group by insid, repterritoryid, p."ProductID", cycle;
 
-RAISE NOTICE 'Step1 - ITPCD Refresh Done';
+insert into "InsTrtyProductCycleTarget" ("RepTerritoryCode", "Cycle", "InsID", "InsName", "ProductID", "ProductName", "ProductName_EN", "TargetValue", "TargetUnit")
+select
+    repterritoryid as "RepTerritoryCode",
+    cycle as "Cycle",
+    insid as "InsID",
+    max(insname) as "InsName",
+    p."ProductID" as "ProductID",
+    max(p."ProductName") as "ProductName",
+    max(productname) as "ProductName_EN",
+    sum(targetvalue::numeric(28,8)) as "TargetValue",
+    sum(targetunit::numeric(28,8)) as "TargetUnit"
+from instrtyproductcycledata_raw itpcd
+join "Product" p on itpcd.productid = p."ProductID"
+join "OrgCycle" oc on itpcd.repterritoryid = oc."RepTerritoryID" and oc."Cycle" =(select max("cycle") from "instrtyproductcycledata_raw" where salesvalue>0)
+group by insid, repterritoryid, p."ProductID", cycle;
+
+RAISE NOTICE 'Step1 - ITPCD & ITPCT Refresh Done';
 
 --Step2. Update InsTrtyProductQuarterData
 drop table if exists InsTrtyProductQuarterSales;
 CREATE TEMP Table InsTrtyProductQuarterSales AS
-SELECT C.QUARTER_TEXT,
-    max(C.quarter_start_date) as quarter_start_date,
-    max(C.quarter_end_date) as quarter_end_date,
-    ITPCD."InsID" as InsID,
-    MAX(ITPCD."InsName") as InsName,
-    ITPCD."RepTerritoryCode" as RepTerritoryCode,
-    ITPCD."ProductID" as ProductID,
-    MAX(ITPCD."ProductName") as ProductName,
-    MAX(ITPCD."ProductName_EN") as ProductName_EN,
-    ROUND(SUM(ITPCD."SalesValue"),1) AS sales_cq,
-    ROUND(SUM(ITPCD."SalesValue") / NULLIF(COUNT(DISTINCT ITPCD."Cycle"),0),1) AS avg_sales_cq,
-    ROUND(SUM(ITPCD."SalesUnit"),1) AS sales_unit_cq,
-    ROUND(SUM(ITPCD."SalesUnit") / NULLIF(COUNT(DISTINCT ITPCD."Cycle"),0),1) AS avg_sales_unit_cq
-FROM "InsTrtyProductCycleData" ITPCD
-JOIN DIM_CALENDAR C ON ITPCD."Cycle" = C.MONTH_TEXT and C.DAY_OF_MONTH_NUM = 1
-GROUP BY C.QUARTER_TEXT,
-    ITPCD."InsID",
-    ITPCD."RepTerritoryCode",
-    ITPCD."ProductID"
-order by ITPCD."InsID",
-    ITPCD."RepTerritoryCode",
-    ITPCD."ProductID",
-    C.QUARTER_TEXT; -- Updated Rows    708218
+SELECT c.quarter_text,
+    max(c.quarter_start_date) as quarter_start_date,
+    max(c.quarter_end_date) as quarter_end_date,
+    itpcd."InsID" as InsID,
+    max(itpcd."InsName") as InsName,
+    itpcd."RepTerritoryCode" as RepTerritoryCode,
+    itpcd."ProductID" as ProductID,
+    max(itpcd."ProductName") as ProductName,
+    max(itpcd."ProductName_EN") as ProductName_EN,
+    sum(itpcd."SalesValue") as sales_cq,
+    sum(itpcd."SalesValue") / nullif(count(distinct itpcd."Cycle"),0) as avg_sales_cq,
+    sum(itpcd."SalesUnit") as sales_unit_cq,
+    sum(itpcd."SalesUnit") / nullif(count(distinct itpcd."Cycle"),0) as avg_sales_unit_cq
+FROM "InsTrtyProductCycleData" itpcd
+JOIN dim_calendar c ON itpcd."Cycle" = c.month_text and c.day_of_month_num = 1
+GROUP BY c.quarter_text,
+    itpcd."InsID",
+    itpcd."RepTerritoryCode",
+    itpcd."ProductID"
+order by itpcd."InsID",
+    itpcd."RepTerritoryCode",
+    itpcd."ProductID",
+    c.quarter_text; -- 708,218 -> 2,406,460
 
 drop table if exists InsTrtyProductLastQuarterSales;
 CREATE TEMP Table InsTrtyProductLastQuarterSales AS
-SELECT C.QUARTER_TEXT,
-    max(C.quarter_start_date) as quarter_start_date,
-    max(C.quarter_end_date) as quarter_end_date,
-    ITPCD."InsID" as InsID,
-    MAX(ITPCD."InsName") as InsName,
-    ITPCD."RepTerritoryCode" as RepTerritoryCode,
-    ITPCD."ProductID" as ProductID,
-    MAX(ITPCD."ProductName") as ProductName,
-    MAX(ITPCD."ProductName_EN") as ProductName_EN,
-    ROUND(SUM(ITPCD."SalesValue"),1) AS sales_lq,
-    ROUND(SUM(ITPCD."SalesValue") / NULLIF(COUNT(DISTINCT ITPCD."Cycle"),0),1) AS avg_sales_lq,
-    ROUND(SUM(ITPCD."SalesUnit"),1) AS sales_unit_lq,
-    ROUND(SUM(ITPCD."SalesUnit") / NULLIF(COUNT(DISTINCT ITPCD."Cycle"),0),1) AS avg_sales_unit_lq
-FROM "InsTrtyProductCycleData" ITPCD
-JOIN DIM_CALENDAR C ON to_date(ITPCD."Cycle",'yyyymm') = to_date(C.MONTH_TEXT,'yyyymm')-interval '3 month' and C.DAY_OF_MONTH_NUM = 1
-GROUP BY C.QUARTER_TEXT,
-    ITPCD."InsID",
-    ITPCD."RepTerritoryCode",
-    ITPCD."ProductID"
-order by ITPCD."InsID",
-    ITPCD."RepTerritoryCode",
-    ITPCD."ProductID",
-    C.QUARTER_TEXT; --Updated Rows 708218
+SELECT c.quarter_text,
+    max(c.quarter_start_date) as quarter_start_date,
+    max(c.quarter_end_date) as quarter_end_date,
+    itpcd."InsID" as InsID,
+    max(itpcd."InsName") as InsName,
+    itpcd."RepTerritoryCode" as RepTerritoryCode,
+    itpcd."ProductID" as ProductID,
+    max(itpcd."ProductName") as ProductName,
+    max(itpcd."ProductName_EN") as ProductName_EN,
+    sum(itpcd."SalesValue") as sales_lq,
+    sum(itpcd."SalesValue") / nullif(count(distinct itpcd."Cycle"),0) as avg_sales_lq,
+    sum(itpcd."SalesUnit") as sales_unit_lq,
+    sum(itpcd."SalesUnit") / nullif(count(distinct itpcd."Cycle"),0) as avg_sales_unit_lq
+FROM "InsTrtyProductCycleData" itpcd
+JOIN dim_calendar c ON to_date(itpcd."Cycle",'yyyymm') = to_date(c.month_text,'yyyymm')-interval '3 month' and c.day_of_month_num = 1
+GROUP BY c.quarter_text,
+    itpcd."InsID",
+    itpcd."RepTerritoryCode",
+    itpcd."ProductID"
+order by itpcd."InsID",
+    itpcd."RepTerritoryCode",
+    itpcd."ProductID",
+    c.quarter_text; --2,406,460
 
 drop table if exists "InsTrtyProductQuarterData";
 CREATE Table "InsTrtyProductQuarterData" AS
@@ -1672,58 +1681,58 @@ on cq.QUARTER_TEXT=lq.QUARTER_TEXT
 and cq.InsID=lq.InsID
 and cq.RepTerritoryCode=lq.RepTerritoryCode
 and cq.ProductID=lq.ProductID;
--- Updated Rows 708218
+-- 2,406,460
 
 RAISE NOTICE 'Step2 - ITPQD Refresh Done';
 
 --Step3. Update InsTrtyProductMonthData
 drop table if exists InsTrtyProductR3MSales;
 CREATE TEMP Table InsTrtyProductR3MSales AS
-SELECT C.month_text,
+SELECT c.month_text,
     max(c.rolling_3m_start_date) as rolling_3m_start_date,
     max(c.rolling_3m_end_date) as rolling_3m_end_date,
-    ITPCD."InsID" as InsID,
-    MAX(ITPCD."InsName") as InsName,
-    ITPCD."RepTerritoryCode" as RepTerritoryCode,
-    ITPCD."ProductID" as ProductID,
-    MAX(ITPCD."ProductName") as ProductName,
-    MAX(ITPCD."ProductName_EN") as ProductName_EN,
-    ROUND(sum(itpcd."SalesValue"),1) AS rolling_3m_sales,
-    ROUND(sum(itpcd."SalesUnit"),1) AS rolling_3m_sales_unit
-FROM "InsTrtyProductCycleData" ITPCD
-JOIN DIM_CALENDAR C ON itpcd."Cycle" between to_char(c.rolling_3m_start_date,'yyyymm') and to_char(c.rolling_3m_end_date,'yyyymm') and C.DAY_OF_MONTH_NUM = 1
-GROUP BY C.month_text,
-    ITPCD."InsID",
-    ITPCD."RepTerritoryCode",
-    ITPCD."ProductID"
-order by ITPCD."InsID",
-    ITPCD."RepTerritoryCode",
-    ITPCD."ProductID",
-    C.month_text; -- Updated Rows  2124654
+    itpcd."InsID" as InsID,
+    max(itpcd."InsName") as InsName,
+    itpcd."RepTerritoryCode" as RepTerritoryCode,
+    itpcd."ProductID" as ProductID,
+    max(itpcd."ProductName") as ProductName,
+    max(itpcd."ProductName_EN") as ProductName_EN,
+    sum(itpcd."SalesValue") AS rolling_3m_sales,
+    sum(itpcd."SalesUnit") AS rolling_3m_sales_unit
+FROM "InsTrtyProductCycleData" itpcd
+JOIN (select * from dim_calendar where day_of_month_num = 1) c ON to_date(itpcd."Cycle",'yyyymm') between c.rolling_3m_start_date and c.rolling_3m_end_date
+GROUP BY c.month_text,
+    itpcd."InsID",
+    itpcd."RepTerritoryCode",
+    itpcd."ProductID"
+order by itpcd."InsID",
+    itpcd."RepTerritoryCode",
+    itpcd."ProductID",
+    c.month_text; -- 7807882
 
 drop table if exists InsTrtyProductP3MSales;
 CREATE TEMP Table InsTrtyProductP3MSales AS
 SELECT to_char(to_date(c.month_text,'yyyymm') + interval '3 month', 'yyyymm') as month_text,
     max(c.rolling_3m_start_date) as previous_3m_start_date,
     max(c.rolling_3m_end_date) as previous_3m_end_date,
-    ITPCD."InsID" as InsID,
-    MAX(ITPCD."InsName") as InsName,
-    ITPCD."RepTerritoryCode" as RepTerritoryCode,
-    ITPCD."ProductID" as ProductID,
-    MAX(ITPCD."ProductName") as ProductName,
-    MAX(ITPCD."ProductName_EN") as ProductName_EN,
-    ROUND(sum(itpcd."SalesValue"),1) AS previous_3m_sales,
-    ROUND(sum(itpcd."SalesUnit"),1) AS previous_3m_sales_unit
-FROM "InsTrtyProductCycleData" ITPCD
-JOIN DIM_CALENDAR C ON itpcd."Cycle" between to_char(c.rolling_3m_start_date,'yyyymm') and to_char(c.rolling_3m_end_date,'yyyymm') and C.DAY_OF_MONTH_NUM = 1
-GROUP BY C.month_text,
-    ITPCD."InsID",
-    ITPCD."RepTerritoryCode",
-    ITPCD."ProductID"
-order by ITPCD."InsID",
+    itpcd."InsID" as InsID,
+    max(itpcd."InsName") as InsName,
+    itpcd."RepTerritoryCode" as RepTerritoryCode,
+    itpcd."ProductID" as ProductID,
+    max(itpcd."ProductName") as ProductName,
+    max(itpcd."ProductName_EN") as ProductName_EN,
+    sum(itpcd."SalesValue") AS previous_3m_sales,
+    sum(itpcd."SalesUnit") AS previous_3m_sales_unit
+FROM "InsTrtyProductCycleData" itpcd
+JOIN (select * from dim_calendar where day_of_month_num = 1) c ON to_date(itpcd."Cycle",'yyyymm') between c.rolling_3m_start_date and c.rolling_3m_end_date
+GROUP BY c.month_text,
+    itpcd."InsID",
+    itpcd."RepTerritoryCode",
+    itpcd."ProductID"
+order by itpcd."InsID",
     RepTerritoryCode,
     ProductID,
-    month_text; -- Updated Rows    2124654
+    month_text; -- 7807882
 
 drop table if exists "InsTrtyProductMonthData";
 CREATE Table "InsTrtyProductMonthData" AS
@@ -1732,14 +1741,127 @@ from InsTrtyProductR3MSales r3m
 left join "InsTrtyProductCycleData" lm on to_date(r3m.month_text, 'yyyymm') - interval '1 month' = to_date(lm."Cycle",'yyyymm') and r3m.InsID=lm."InsID" and r3m.RepTerritoryCode=lm."RepTerritoryCode" and r3m.ProductID=lm."ProductID"
 left join InsTrtyProductP3MSales p3m on r3m.month_text=p3m.month_text and r3m.InsID=p3m.InsID and r3m.RepTerritoryCode=p3m.RepTerritoryCode and r3m.ProductID=p3m.ProductID; -- Updated Rows        2124654
 
-
-
 RAISE NOTICE 'Step3 - ITPMD Refresh Done';
 
---Step4. Alter table owner
+--Step4. Update InsTrtyProductHalfyearData
+drop table if exists InsTrtyProductHalfyearSales;
+CREATE TEMP Table InsTrtyProductHalfyearSales AS
+SELECT c.halfyear_text,
+    max(c.halfyear_start_date) as halfyear_start_date,
+    max(c.halfyear_end_date) as halfyear_end_date,
+    itpcd."InsID" as InsID,
+    max(itpcd."InsName") as InsName,
+    itpcd."RepTerritoryCode" as RepTerritoryCode,
+    itpcd."ProductID" as ProductID,
+    max(itpcd."ProductName") as ProductName,
+    max(itpcd."ProductName_EN") as ProductName_EN,
+    sum(itpcd."SalesValue") as sales_chy,
+    sum(itpcd."SalesValue") / nullif(count(distinct itpcd."Cycle"),0) as avg_sales_chy,
+    sum(itpcd."SalesUnit") as sales_unit_chy,
+    sum(itpcd."SalesUnit") / nullif(count(distinct itpcd."Cycle"),0) as avg_sales_unit_chy,
+    sum(itpcd."TargetValue") as target_chy,
+    sum(itpcd."TargetValue") / nullif(count(distinct itpcd."Cycle"),0) as avg_target_chy,
+    sum(itpcd."TargetUnit") as target_unit_chy,
+    sum(itpcd."TargetUnit") / nullif(count(distinct itpcd."Cycle"),0) as avg_target_unit_chy    
+FROM "InsTrtyProductCycleData" itpcd
+JOIN dim_calendar c ON itpcd."Cycle" = c.month_text and c.day_of_month_num = 1
+GROUP BY c.halfyear_text,
+    itpcd."InsID",
+    itpcd."RepTerritoryCode",
+    itpcd."ProductID"
+order by itpcd."InsID",
+    itpcd."RepTerritoryCode",
+    itpcd."ProductID",
+    c.halfyear_text; -- 620,041
+
+drop table if exists InsTrtyProductLastHalfyearSales;
+CREATE TEMP Table InsTrtyProductLastHalfyearSales AS
+SELECT c.halfyear_text,
+    max(c.halfyear_start_date) as halfyear_start_date,
+    max(c.halfyear_end_date) as halfyear_end_date,
+    itpcd."InsID" as InsID,
+    max(itpcd."InsName") as InsName,
+    itpcd."RepTerritoryCode" as RepTerritoryCode,
+    itpcd."ProductID" as ProductID,
+    max(itpcd."ProductName") as ProductName,
+    max(itpcd."ProductName_EN") as ProductName_EN,
+    sum(itpcd."SalesValue") as sales_lhy,
+    sum(itpcd."SalesValue") / nullif(count(distinct itpcd."Cycle"),0) as avg_sales_lhy,
+    sum(itpcd."SalesUnit") as sales_unit_lhy,
+    sum(itpcd."SalesUnit") / nullif(count(distinct itpcd."Cycle"),0) as avg_sales_unit_lhy,
+    sum(itpcd."TargetValue") as target_lhy,
+    sum(itpcd."TargetValue") / nullif(count(distinct itpcd."Cycle"),0) as avg_target_lhy,
+    sum(itpcd."TargetUnit") as target_unit_lhy,
+    sum(itpcd."TargetUnit") / nullif(count(distinct itpcd."Cycle"),0) as avg_target_unit_lhy    
+FROM "InsTrtyProductCycleData" itpcd
+JOIN dim_calendar c ON to_date(itpcd."Cycle",'yyyymm') = to_date(c.month_text,'yyyymm')-interval '6 month' and c.day_of_month_num = 1
+GROUP BY c.halfyear_text,
+    itpcd."InsID",
+    itpcd."RepTerritoryCode",
+    itpcd."ProductID"
+order by itpcd."InsID",
+    itpcd."RepTerritoryCode",
+    itpcd."ProductID",
+    c.halfyear_text; --620,041
+    
+drop table if exists InsTrtyProductLastyearCurrentHalfyearSales;
+CREATE TEMP Table InsTrtyProductLastyearCurrentHalfyearSales AS
+SELECT c.halfyear_text,
+    max(c.halfyear_start_date) as halfyear_start_date,
+    max(c.halfyear_end_date) as halfyear_end_date,
+    itpcd."InsID" as InsID,
+    max(itpcd."InsName") as InsName,
+    itpcd."RepTerritoryCode" as RepTerritoryCode,
+    itpcd."ProductID" as ProductID,
+    max(itpcd."ProductName") as ProductName,
+    max(itpcd."ProductName_EN") as ProductName_EN,
+    sum(itpcd."SalesValue") as ly_sales_chy,
+    sum(itpcd."SalesValue") / nullif(count(distinct itpcd."Cycle"),0) as ly_avg_sales_chy,
+    sum(itpcd."SalesUnit") as ly_sales_unit_chy,
+    sum(itpcd."SalesUnit") / nullif(count(distinct itpcd."Cycle"),0) as ly_avg_sales_unit_chy,
+    sum(itpcd."TargetValue") as ly_target_chy,
+    sum(itpcd."TargetValue") / nullif(count(distinct itpcd."Cycle"),0) as ly_avg_target_chy,
+    sum(itpcd."TargetUnit") as ly_target_unit_chy,
+    sum(itpcd."TargetUnit") / nullif(count(distinct itpcd."Cycle"),0) as ly_avg_target_unit_chy    
+FROM "InsTrtyProductCycleData" itpcd
+JOIN dim_calendar c ON to_date(itpcd."Cycle",'yyyymm') = to_date(c.month_text,'yyyymm')-interval '12 month' and c.day_of_month_num = 1
+GROUP BY c.halfyear_text,
+    itpcd."InsID",
+    itpcd."RepTerritoryCode",
+    itpcd."ProductID"
+order by itpcd."InsID",
+    itpcd."RepTerritoryCode",
+    itpcd."ProductID",
+    c.halfyear_text; --620,041
+
+
+drop table if exists "InsTrtyProductHalfyearData";
+CREATE Table "InsTrtyProductHalfyearData" AS
+select chy.*, 
+lhy.sales_lhy, lhy.avg_sales_lhy, lhy.sales_unit_lhy, lhy.avg_sales_unit_lhy, 
+lhy.target_lhy, lhy.avg_target_lhy, lhy.target_unit_lhy, lhy.avg_target_unit_lhy, 
+lchy.ly_sales_chy,lchy.ly_avg_sales_chy,lchy.ly_sales_unit_chy,lchy.ly_avg_sales_unit_chy,
+lchy.ly_target_chy,lchy.ly_avg_target_chy,lchy.ly_target_unit_chy,lchy.ly_avg_target_unit_chy
+from InsTrtyProductHalfyearSales chy
+left join InsTrtyProductLastHalfyearSales lhy
+on chy.halfyear_text=lhy.halfyear_text
+and chy.InsID=lhy.InsID
+and chy.RepTerritoryCode=lhy.RepTerritoryCode
+and chy.ProductID=lhy.ProductID
+left join InsTrtyProductLastyearCurrentHalfyearSales lchy
+on chy.halfyear_text=lchy.halfyear_text
+and chy.InsID=lchy.InsID
+and chy.RepTerritoryCode=lchy.RepTerritoryCode
+and chy.ProductID=lchy.ProductID;
+-- 620,041
+
+RAISE NOTICE 'Step4 - ITPHD Refresh Done';
+
+--Step5. Alter table owner
 alter table "InsTrtyProductCycleData" owner to nvs_user_dw;
 alter table "InsTrtyProductQuarterData" owner to nvs_user_dw;
 alter table "InsTrtyProductMonthData" owner to nvs_user_dw;
+alter table "InsTrtyProductHalfyearData" owner to nvs_user_dw;
 
 
 end;
@@ -2044,6 +2166,3 @@ RAISE NOTICE 'LowPerformance - Standardize columns done';
 end;
 $procedure$
 ;
-
-
-
