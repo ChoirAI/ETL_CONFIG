@@ -64,6 +64,7 @@ update dim_geo_1 set "geo_lvl5"='C. America'  where "geo_lvl5_raw" in ('Costa Ri
 RAISE NOTICE 'Dim Geo Step2 - Cleanse column values done';
 
 -- 3. Drop internal tables
+DROP TABLE if exists public.dim_geo cascade;
 alter table dim_geo_1 rename to dim_geo;
 alter table dim_geo owner to az_user_dw;
 
@@ -166,6 +167,7 @@ where dp.product_code = dpa.product_code; --413
 RAISE NOTICE 'Dim Product Step3 - Add columns done';
 
 -- 4. Drop internal tables
+DROP TABLE if exists public.dim_product cascade;
 alter table dim_product_1 rename to dim_product;
 alter table dim_product owner to az_user_dw;
 
@@ -1481,6 +1483,7 @@ RAISE NOTICE 'IQVIA Corp Rank Step6 - Create Cross Join table done';
 
 
 -- 6. Drop internal tables
+drop table if exists fact_iqvia_qtr_corp_rnk cascade;
 alter table fact_iqvia_qtr_corp_rnk_3 rename to fact_iqvia_qtr_corp_rnk;
 drop table fact_iqvia_qtr_corp_rnk_1;
 drop table fact_iqvia_qtr_corp_rnk_2;
