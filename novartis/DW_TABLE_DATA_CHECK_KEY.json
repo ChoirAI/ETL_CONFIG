@@ -19,6 +19,9 @@
 		"InsProdProperty": [
 			"select count(*) as total_count, count(distinct brand) as brand_count, count(distinct institutionid) as institutionid_count from \"insprodproperty_raw\";"
 		],
+		"TrtyProdProperty": [
+			"select count(*) as total_count, count(distinct brand) as brand_count, count(distinct franchise) as franchise_count from \"franchisebrandgroup_raw\";"
+		],
 		"MarketAreaMapping": [
 			"select count(*) as total_count, count(distinct \"geographyid\") as geographyid_count from \"marketareamapping_raw\";"
 		],
@@ -65,7 +68,10 @@
 			"select * from \"InsTrtyProductCycleData\" itpcd \nleft join \"Institution\" i on itpcd.\"InsID\" = i.\"InstitutionID\" \nwhere i.\"InstitutionID\" is null;"
 		],
 		"InsProdProperty":[
-			"select * from \"InsProdProperty\" ipp \nleft join \"Product\" p on ipp.\"ProductID\" = p.\"ProductID\" \nwhere p.\"ProductID\" is null;"
+			"select * from \"InsProdProperty\" ipp \nleft join \"Product\" p on ipp.\"ProductID\" = p.\"BrandID\" \nwhere p.\"BrandID\" is null;"
+		],
+		"TrtyProdProperty":[
+			"select distinct brand, franchise from franchisebrandgroup_raw fr \nleft join \"TrtyProdProperty\" tpp on fr.franchise = tpp.\"FHTerritoryName\" and fr.brand = tpp.\"ProductName_EN\" \nwhere fr.ym=(select max(ym) from franchisebrandgroup_raw) \nand tpp.\"FHTerritoryID\" is null;"
 		],
 		"dim_calendar":[
 			"select array_agg(distinct year_text) from dim_calendar;",
@@ -134,6 +140,9 @@
 		"InsProdProperty":[
 			"select \"InstitutionID\", \"ProductID\" from \"InsProdProperty\" group by \"InstitutionID\", \"ProductID\" having count(*)>1 limit 10;"
 		],
+		"TrtyProdProperty":[
+			"select \"FHTerritoryID\", \"ProductID\" from \"TrtyProdProperty\" group by \"FHTerritoryID\", \"ProductID\" having count(*)>1 limit 10;"
+		],
 		"dim_calendar":[
 			"select \"date\" from dim_calendar group by \"date\" having count(*)>1; "
 		],
@@ -183,6 +192,10 @@
 		],
 		"InsProdProperty":[
 			"select * from \"InsProdProperty\" ipp\njoin \"Institution\" i on ipp.\"InstitutionID\" = i.\"InstitutionID\" limit 100;"
+		],
+		"TrtyProdProperty":[
+			"select * from \"TrtyProdProperty\" tpp \njoin \"Product\" p on tpp.\"ProductID\" = p.\"BrandID\" \nwhere p.\"BrandID\" is null limit 100;",
+			"select * from \"TrtyProdProperty\" tpp \njoin \"OrgCycle\" oc on tpp.\"FHTerritoryID\" = oc.\"FHTerritoryID\" and oc.\"Cycle\" = (select max(\"Cycle\") from \"InsTrtyProductCycleData\" itpcd where \"SalesValue\" > 0) \nwhere oc.\"Cycle\" is null limit 100;"
 		],
 		"dim_calendar":[
 			"select distinct itpcd.\"Cycle\" from \"InsTrtyProductCycleData\" itpcd\njoin dim_calendar dc on itpcd.\"Cycle\" = dc.month_text;"

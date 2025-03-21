@@ -91,6 +91,61 @@ $procedure$
 ;
 
 
+CREATE OR REPLACE PROCEDURE public.proc_cleanse_trtyprodproperty()
+ LANGUAGE plpgsql
+AS $procedure$
+BEGIN
+
+
+--=============================================================================================================================
+-- TrtyProdProperty
+--=============================================================================================================================
+RAISE NOTICE 'TrtyProdProperty started';
+
+drop table if exists "TrtyProdProperty_arc";
+create table "TrtyProdProperty_arc" as select * from "TrtyProdProperty";
+DROP TABLE "TrtyProdProperty";
+
+CREATE TABLE "TrtyProdProperty" (
+        "BUHTerritoryID" varchar(50) NULL,
+        "BUHTerritoryName" varchar(100) NULL,
+        "FHTerritoryID" varchar(50) NULL,
+        "FHTerritoryName" varchar(100) NULL,
+        "ProductID" varchar(20) NULL,
+        "ProductName" varchar(100) NULL,
+        "ProductName_EN" varchar(100) NULL,
+        "TrtyProdProperty1" varchar(100) NULL,
+        "TrtyProdProperty2" varchar(100) NULL,
+        "TrtyProdProperty3" varchar(100) NULL
+);
+
+INSERT INTO "TrtyProdProperty" ("BUHTerritoryID", "BUHTerritoryName", "FHTerritoryID", "FHTerritoryName", "ProductID", "ProductName", "ProductName_EN", "TrtyProdProperty1", "TrtyProdProperty2", "TrtyProdProperty3")
+select
+        oc."BUHTerritoryID",
+        oc."BUHTerritoryName",
+        oc."FHTerritoryID",
+        oc."FHTerritoryName",
+        p."BrandID" as "ProductID",
+        p."BrandName" as "ProductName",
+        p."BrandName_EN" as "ProductName_EN",
+        max(fr.brandgroup) as "TrtyProdProperty1",
+        null as "TrtyProdProperty2",
+        null as "TrtyProdProperty3"        
+from franchisebrandgroup_raw fr 
+join (select distinct "BUHTerritoryID", "BUHTerritoryName", "FHTerritoryID", "FHTerritoryName" from "OrgCycle" where "Cycle" = (select max("Cycle") from "OrgCycle")) oc on fr.franchise = oc."FHTerritoryName" 
+join "Product" p on fr.brand = p."BrandName_EN" and p."IsStandardSKU"
+where fr.ym = (select max(ym) from franchisebrandgroup_raw)
+group by 1,2,3,4,5,6,7; --66
+
+alter table "TrtyProdProperty" owner to nvs_user_dw;
+alter table "TrtyProdProperty_arc" owner to nvs_user_dw;
+
+RAISE NOTICE 'TrtyProdProperty Ready';
+
+
+END;
+$procedure$
+;
 
 
 
