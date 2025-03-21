@@ -161,7 +161,6 @@ CREATE TABLE public.fact_iqvia_qtr_gmd_ms_raw (
 DROP TABLE IF EXISTS public.fact_ireal_mainlist_raw;
 
 CREATE TABLE public.fact_ireal_mainlist_raw (
-	column1 int4 NULL,
 	modified varchar(100) NULL,
 	market varchar(100) NULL,
 	emrad_target_approval_date varchar(100) NULL,
