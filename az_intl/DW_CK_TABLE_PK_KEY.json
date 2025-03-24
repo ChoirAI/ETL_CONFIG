@@ -1,3 +1,95 @@
 {
-
+  "dim_calendar": [
+    "date"
+  ],
+  "dim_geo": [
+    "entity_code"
+  ],
+  "dim_geo_cluster": [
+    "geo_cluster_key"
+  ],
+  "dim_product": [
+    "product_code"
+  ],
+  "dim_product_mapping": [
+    "product_name"
+  ],
+  "fact_iqvia_mth_gmd": [
+    "gmd_sub_mkt",
+    "period",
+    "cluster_ii"
+  ],
+  "fact_iqvia_mth_gmd_ms": [
+    "gmd_sub_mkt",
+    "period",
+    "cluster_ii"
+  ],
+  "fact_iqvia_qtr_corp_rnk": [
+    "cluster_ii",
+    "corporation",
+    "therapy_area",
+    "period"
+  ],
+  "fact_iqvia_qtr_gmd": [
+    "gmd_sub_mkt",
+    "period",
+    "cluster_ii"
+  ],
+  "fact_iqvia_qtr_gmd_ms": [
+    "gmd_sub_mkt",
+    "period",
+    "cluster_ii"
+  ],
+  "fact_iqvia_qtr_ta": [
+    "ta_key"
+  ],
+  "fact_ireal_mainlist": [
+    "id"
+  ],
+  "fact_propel_sales_external": [
+    "years",
+    "period",
+    "product_code",
+    "entity_code"
+  ],
+  "fact_ireal_event": [
+    "market",
+    "brand",
+    "indication",
+    "ireal_phase",
+    "ireal_status"
+  ],
+  "fact_ireal_metric": [
+    "id"
+  ],
+  "iqvia_gmd_product": [
+    "gmd_sub_mkt",
+    "international_product"
+  ],
+  "fact_iqvia_mth_class": [
+    "cluster_ii",
+    "period",
+    "gmd_sub_mkt"
+  ],
+  "fact_iqvia_qtr_class": [
+    "cluster_ii",
+    "period",
+    "gmd_sub_mkt"
+  ],
+  "fact_iqvia_mth_class": [
+    "cluster_ii",
+    "period",
+    "gmd_sub_mkt"
+  ],
+  "fact_iqvia_qtr_class": [
+    "cluster_ii",
+    "period",
+    "gmd_sub_mkt"
+  ],
+  "fact_propel_target_external": [
+    "years",
+    "period",
+    "product_code",
+    "entity_code"
+  ]
 }
