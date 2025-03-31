@@ -80,6 +80,21 @@ where pr.is_active=1;
 update "Product" p set "BrandName" = pmr.productname
 from productmapping_raw pmr where p."BrandID" = pmr.productid and p."BrandName" <> pmr.productname; --4
 
+update "Product" set "ProductName_EN" = 'Co-Diovan 80/12.5mg*7' where "ProductID" = '43';
+update "Product" set "ProductName_EN" = 'Lescol XL 80mg*7' where "ProductID" = '79';
+update "Product" set "ProductName_EN" = 'Exforge 80/5mg*7' where "ProductID" = '80';
+update "Product" set "ProductName_EN" = 'Galvus 50mg*14' where "ProductID" = '83';
+update "Product" set "ProductName_EN" = 'Lucentis 10ml*1' where "ProductID" = '84';
+update "Product" set "ProductName_EN" = 'Eucreas 850/50mg*30' where "ProductID" = '528';
+update "Product" set "ProductName_EN" = 'Tobradex-S 5ml' where "ProductID" = '557';
+update "Product" set "ProductName_EN" = 'Tobradex-O 3.5g' where "ProductID" = '559';
+update "Product" set "ProductName_EN" = 'Travatan 2.5ml' where "ProductID" = '562';
+update "Product" set "ProductName_EN" = 'Azopt 5ml' where "ProductID" = '564';
+update "Product" set "ProductName_EN" = 'Betoptic S 5ml' where "ProductID" = '566';
+update "Product" set "ProductName_EN" = 'Duotrav 2.5ml' where "ProductID" = '570';
+update "Product" set "ProductName_EN" = 'Azarga 5ml' where "ProductID" = '572';
+update "Product" set "ProductName_EN" = 'Patanol 5ml' where "ProductID" = '593';
+
 alter table "Product" owner to nvs_user_dw;
 alter table "Product_arc" owner to nvs_user_dw;
 
