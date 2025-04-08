@@ -568,7 +568,7 @@ CREATE OR REPLACE PROCEDURE public.proc_cleanse_fact_iqvia_mth_gmd_ms()
 AS $procedure$
 BEGIN
 
-
+SET work_mem = '64MB';
 --=============================================================================================================================
 -- IQVIA Mth GMD MS
 --=============================================================================================================================
@@ -876,7 +876,7 @@ CREATE OR REPLACE PROCEDURE public.proc_cleanse_fact_iqvia_qtr_gmd_ms()
 AS $procedure$
 BEGIN
 
-
+SET work_mem = '64MB';
 --=============================================================================================================================
 -- IQVIA Qtr GMD MS
 --=============================================================================================================================
@@ -1123,77 +1123,7 @@ and f.cluster_ii=gc.cluster_ii and f."period"=gc."period";--464
 
 RAISE NOTICE 'IQVIA Qtr GMD MS Step5 - fact_iqvia_qtr_class created';
 
--- 6. Create a Cartesian table with the CROSS JOIN of product+period+geo for both Mth and Qtr
-drop table if exists fact_iqvia_qtr_gmd_ms;
-create table fact_iqvia_qtr_gmd_ms as select * from fact_iqvia_qtr_gmd_ms_arc where 1=2;
-insert into fact_iqvia_qtr_gmd_ms
-select
-        geo."cluster",
-        geo.cluster_i,
-        geo.cluster_ii,
-        prod.corporation,
-        prod.therapy_area,
-        prod.gmd,
-        prod.gmd_sub_mkt,
-        prod.product_family,
-        prod.international_product,
-        prod.international_product_raw,
-        prod.local_product,
-        prod.product_key,
-        cal.load_dt,
-        cal."period",
-        f3.days_of_therapy,
-        f3.units,
-        f3.volume,
-        f3.us_dollars_actual,
-        gmd.class_size as gmd_sub_market_size,
-        gmd.class_vol_size as gmd_sub_market_vol_size,
-        f3.ly_us_dollars_actual,
-        f3.ly_volume,
-        gmd.ly_class_size as ly_gmd_sub_market_size,
-        gmd.ly_class_vol_size as ly_gmd_sub_market_vol_size
-from
-(select
-        max(corporation) as corporation,
-        max(therapy_area) as therapy_area,
-        max(gmd) as gmd,
-        gmd_sub_mkt,
-        max(product_family) as product_family,
-        max(international_product) as international_product,
-        max(international_product_raw) as international_product_raw,
-        max(local_product) as local_product,
-        product_key
-from fact_iqvia_qtr_gmd_ms_3
-group by gmd_sub_mkt, product_key) prod
-join (select "period", max(load_dt) as load_dt from fact_iqvia_qtr_gmd_ms_3 where to_date(period,'dd/mm/yyyy')>=(select to_date(to_char(max(to_date(period,'dd/mm/yyyy')) - interval '1 year', 'yyyy'), 'yyyy') from fact_iqvia_qtr_gmd_ms_3) group by "period") cal on 1=1
-join (select distinct "cluster", cluster_i, cluster_ii from fact_iqvia_qtr_gmd_ms_3) geo on 1=1
-left join fact_iqvia_qtr_class gmd on prod.gmd_sub_mkt = gmd.gmd_sub_mkt and cal."period" = gmd."period" and geo.cluster_ii = gmd.cluster_ii
-left join fact_iqvia_qtr_gmd_ms_3 f3 on prod.product_key = f3.product_key and cal."period" = f3."period" and geo.cluster_ii = f3.cluster_ii
-;--Updated Rows        32956528
 
-RAISE NOTICE 'IQVIA Mth GMD MS Step6 - Create Cross Join table fact_iqvia_qtr_gmd_ms done';
-
--- 7. Drop internal tables
-drop table fact_iqvia_qtr_gmd_ms_1;
-drop table fact_iqvia_qtr_gmd_ms_2;
-drop table fact_iqvia_qtr_gmd_ms_3;
-alter table fact_iqvia_qtr_gmd_ms owner to az_user_dw;
-alter table fact_iqvia_qtr_class owner to az_user_dw;
-
-
-RAISE NOTICE 'IQVIA Qtr GMD MS Done, remember to VACUUM the table';
-
-drop table if exists iqvia_gmd_product_arc;
-alter table iqvia_gmd_product rename to iqvia_gmd_product_arc;
-
-create table iqvia_gmd_product as
-select distinct therapy_area, gmd, gmd_sub_mkt, product_family, international_product, international_product_raw from fact_iqvia_qtr_gmd_ms
-union
-select distinct therapy_area, gmd, gmd_sub_mkt, product_family, international_product, international_product_raw from fact_iqvia_mth_gmd_ms;
-
-alter table iqvia_gmd_product owner to az_user_dw;
-
-RAISE NOTICE 'IQVIA iqvia_gmd_product done';
 
 END;
 $procedure$
@@ -1207,6 +1137,7 @@ CREATE OR REPLACE PROCEDURE public.proc_cleanse_fact_iqvia_qtr_corp_rnk()
 AS $procedure$
 BEGIN
 
+SET work_mem = '64MB';
 --=============================================================================================================================
 -- IQVIA Corp Rank
 --=============================================================================================================================
@@ -1377,124 +1308,6 @@ CREATE INDEX fact_iqvia_qtr_ta_pk_idx ON fact_iqvia_qtr_ta USING hash (ta_key);
 
 RAISE NOTICE 'IQVIA Corp Rank Step5 - fact_iqvia_qtr_ta created';
 
--- 6. Create a Cartesian table with the CROSS JOIN of product+period+geo for Corp Rank
-drop table if exists fact_iqvia_qtr_corp_rnk_3;
-create table fact_iqvia_qtr_corp_rnk_3 as
-select "cluster", cluster_i, cluster_ii, corporation, therapy_area, load_dt, "period", '' as ta_key, days_of_therapy, units, us_dollars_actual, ly_us_dollars_actual, ly_units
-from fact_iqvia_qtr_corp_rnk_2 where 1=2;
-
-insert into fact_iqvia_qtr_corp_rnk_3
-select
-        geo."cluster",
-        geo.cluster_i,
-        geo.cluster_ii,
-        corp.corporation,
-        ta.therapy_area,
-        cal.load_dt,
-        cal."period",
-        md5(ta.therapy_area || cal."period" || geo.cluster_ii) as ta_key,
-        f2.days_of_therapy,
-        f2.units,
-        f2.us_dollars_actual,
-        f2.ly_us_dollars_actual,
-        f2.ly_units
-from (select distinct corporation from fact_iqvia_qtr_corp_rnk_2) corp
-join (select distinct therapy_area from fact_iqvia_qtr_corp_rnk_2) ta on 1=1
-join (select distinct "period", load_dt from fact_iqvia_qtr_corp_rnk_2 where "period">=(select to_date(to_char(max(period) - interval '1 year', 'yyyy'), 'yyyy') from fact_iqvia_qtr_corp_rnk_2)) cal on 1=1
-join (select distinct "cluster", cluster_i, cluster_ii from fact_iqvia_qtr_corp_rnk_2) geo on 1=1
-left join fact_iqvia_qtr_corp_rnk_2 f2 on corp.corporation = f2.corporation and ta.therapy_area = f2.therapy_area and cal."period" = f2."period" and geo.cluster_ii = f2.cluster_ii
-;--26,545,024
-
-drop index if exists fact_iqvia_qtr_corp_rnk_ta_idx;
-CREATE INDEX fact_iqvia_qtr_corp_rnk_ta_idx ON fact_iqvia_qtr_corp_rnk_3 USING hash (ta_key);
-
-RAISE NOTICE 'IQVIA Corp Rank Step6 - Create Cross Join table done';
-
---6.2 Create partition tables for fact_iqvia_qtr_corp_rnk_3 based on period
---drop table if exists fact_iqvia_qtr_corp_rnk_4;
---create table fact_iqvia_qtr_corp_rnk_4 as select * from fact_iqvia_qtr_corp_rnk_3 where 1=2;
---
---drop table if exists fact_iqvia_qtr_corp_rnk_4_2023;
---CREATE TABLE fact_iqvia_qtr_corp_rnk_4_2023 (
---    CHECK (to_char("period", 'YYYY')::int = 2023)
---) INHERITS (fact_iqvia_qtr_corp_rnk_4);
---
---drop table if exists fact_iqvia_qtr_corp_rnk_4_2024;
---CREATE TABLE fact_iqvia_qtr_corp_rnk_4_2024 (
---    CHECK (to_char("period", 'YYYY')::int = 2024)
---) INHERITS (fact_iqvia_qtr_corp_rnk_4);
---
---CREATE TRIGGER insert_fact_iqvia_qtr_corp_rnk_4_trigger
---BEFORE INSERT ON fact_iqvia_qtr_corp_rnk_4
---FOR EACH ROW EXECUTE FUNCTION fact_iqvia_qtr_corp_rnk_4_insert_trigger();
---
---insert into fact_iqvia_qtr_corp_rnk_4 select * from fact_iqvia_qtr_corp_rnk_3;
---CREATE INDEX fact_iqvia_qtr_corp_rnk4_2023_ta_idx ON fact_iqvia_qtr_corp_rnk_4_2023 USING hash (ta_key);
-----CREATE INDEX fact_iqvia_qtr_corp_rnk4_2023_period_idx ON fact_iqvia_qtr_corp_rnk_4_2023 USING brin ("period");
---CREATE INDEX fact_iqvia_qtr_corp_rnk4_2024_ta_idx ON fact_iqvia_qtr_corp_rnk_4_2024 USING hash (ta_key);
-----CREATE INDEX fact_iqvia_qtr_corp_rnk4_2024_period_idx ON fact_iqvia_qtr_corp_rnk_4_2024 USING brin ("period");
-
---6.3 Create MATERIALIZED VIEW
---drop materialized view if exists fact_iqvia_qtr_corp_rnk_dc_dg;
---create materialized view fact_iqvia_qtr_corp_rnk_dc_dg as
---select
---        f.cluster,
---        f.cluster_i,
---        f.cluster_ii,
---        f.corporation,
---        f.therapy_area,
---        f.load_dt,
---        f.days_of_therapy,
---        f.units,
---        f.us_dollars_actual,
---        fiqt.market_size,
---        fiqt.market_units_size,
---        f.ly_us_dollars_actual,
---        f.ly_units,
---        fiqt.ly_market_size,
---        fiqt.ly_market_units_size,
---        c.month_text,
---        c.quarter_text,
---        c.year_text,
---        g.geo_lvl1,
---        g.geo_lvl2,
---        g.geo_lvl3,
---        g.geo_lvl4,
---        g.geo_lvl5
---from
---        fact_iqvia_qtr_corp_rnk as f
---join fact_iqvia_qtr_ta as fiqt on f.ta_key = fiqt.ta_key
---join (
---        select
---                distinct
---   geo_lvl1,
---                geo_lvl2,
---                geo_lvl3,
---                geo_lvl4,
---                geo_lvl5
---        from
---                dim_geo
---        where
---                entity_code like '440%') as g on f.cluster_ii = g.geo_lvl5
---join dim_calendar as c on f."period" = c."date";
---
---drop INDEX fact_iqvia_qtr_corp_rnk_dc_dg_idx;
---CREATE INDEX fact_iqvia_qtr_corp_rnk_dc_dg_idx ON fact_iqvia_qtr_corp_rnk_dc_dg USING btree (month_text, geo_lvl1, geo_lvl4, corporation);
-
-
--- 6. Drop internal tables
-drop table if exists fact_iqvia_qtr_corp_rnk cascade;
-alter table fact_iqvia_qtr_corp_rnk_3 rename to fact_iqvia_qtr_corp_rnk;
-drop table fact_iqvia_qtr_corp_rnk_1;
-drop table fact_iqvia_qtr_corp_rnk_2;
---drop table fact_iqvia_qtr_corp_rnk_3;
-
-alter table fact_iqvia_qtr_ta owner to az_user_dw;
-alter table fact_iqvia_qtr_corp_rnk owner to az_user_dw;
---alter table fact_iqvia_qtr_corp_rnk_4_2023 owner to az_user_dw;
---alter table fact_iqvia_qtr_corp_rnk_4_2024 owner to az_user_dw;
-
-RAISE NOTICE 'IQVIA Corp Rank Done, remember to VACUUM the table';
 
 END;
 $procedure$
