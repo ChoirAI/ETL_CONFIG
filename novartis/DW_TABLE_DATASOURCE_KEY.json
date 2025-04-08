@@ -9,15 +9,17 @@
       "Institution",
       "OrgCycle",
       "InsProdProperty",
+      "TrtyProdProperty",
       "InsTrtyProductCycleData",
-      "InsTrtyProductChannelCycleData"
+      "InsTrtyProductChannelCycleData",
+      "InsProdListing"
     ]
   },
   {
     "name": "ims",
     "priority": 2,
     "tables": [
-      "Geography",
+      "Product",
       "ProductMapping",
       "TerritoryAreaMapping",
       "MarketAreaMapping",
@@ -32,15 +34,8 @@
     ]
   },
   {
-    "name": "hospital listing",
-    "priority": 4,
-    "tables": [
-      "InsProdListing"
-    ]
-  },
-  {
     "name": "low performance",
-    "priority": 5,
+    "priority": 4,
     "tables": [
       "LowPerformance"
     ]

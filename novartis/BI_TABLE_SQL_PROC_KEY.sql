@@ -162,6 +162,11 @@ insert into bi_scope_lookup
 select gen_random_uuid() as id, now() as created_at, now() as updated_at, null as deleted_at, "InstitutionTier" as range_external_id, "InstitutionTier" as range_standard_name, "InstitutionTier"  as range_local_name, 'CN' as local_language, 'institution_tier' as "level", 'institution' as "type" from "Institution" i
 where nullif("InstitutionTier",'') is not null and not exists (select 1 from bi_scope_lookup bsl where bsl.level = 'institution_tier' and upper(bsl.range_local_name) = upper(i."InstitutionTier"))
 group by i."InstitutionTier";--14
+--institution_ownership
+insert into bi_scope_lookup
+select gen_random_uuid() as id, now() as created_at, now() as updated_at, null as deleted_at, "InstitutionType2" as range_external_id, "InstitutionType2" as range_standard_name, "InstitutionType2"  as range_local_name, 'CN' as local_language, 'institution_ownership' as "level", 'institution' as "type" from "Institution" i
+where nullif("InstitutionType2",'') is not null and not exists (select 1 from bi_scope_lookup bsl where bsl.level = 'institution_ownership' and upper(bsl.range_local_name) = upper(i."InstitutionType2"))
+group by i."InstitutionType2";--4
 --institution_product_segment
 insert into bi_scope_lookup
 select gen_random_uuid() as id, now() as created_at, now() as updated_at, null as deleted_at, "InsProdProperty1" as range_external_id, "InsProdProperty1" as range_standard_name, "InsProdProperty1"  as range_local_name, 'CN' as local_language, 'institution_product_segment' as "level", 'institution' as "type" from "InsProdProperty" ipp
@@ -359,142 +364,155 @@ group by bsla.range_standard_name, bsla.range_local_name, bsla."level", bsla."ty
 RAISE NOTICE 'Build bi_scope_lookup Step3 - Territory done';
 
 -- 4. Product setup
---        brand
+--brand
 insert into bi_scope_lookup
 select gen_random_uuid() as id, NOW() as created_at, NOW() as updated_at, null as deleted_at, min(p."BrandID"), p."BrandName", p."BrandName", 'CN', 'brand', 'product'
-from "Product" p join "InsTrtyProductCycleData" itpcd on itpcd."ProductID" = p."ProductID"
+from "Product" p --join "InsTrtyProductCycleData" itpcd on itpcd."ProductID" = p."ProductID"
 where nullif(p."BrandName",'') is not null and not exists (select 1 from bi_scope_lookup bsl where bsl.type = 'product' and upper(bsl.range_local_name) = upper(p."BrandName"))
-group by p."BrandName"; --26
+group by p."BrandName"; --76
 insert into bi_scope_lookup
 select gen_random_uuid() as id, NOW() as created_at, NOW() as updated_at, null as deleted_at, min(p."BrandID"), p."BrandName", p."BrandName_EN", 'CN', 'brand', 'product'
-from "Product" p join "InsTrtyProductCycleData" itpcd on itpcd."ProductID" = p."ProductID"
+from "Product" p --join "InsTrtyProductCycleData" itpcd on itpcd."ProductID" = p."ProductID"
 where nullif(p."BrandName_EN",'') is not null and not exists (select 1 from bi_scope_lookup bsl where bsl.type = 'product' and upper(bsl.range_local_name) = upper(p."BrandName_EN"))
-group by p."BrandName", p."BrandName_EN"; --26
+group by p."BrandName", p."BrandName_EN"; --75
 insert into bi_scope_lookup
 select gen_random_uuid() as id, NOW() as created_at, NOW() as updated_at, null as deleted_at, max("ExternalProductID"), coalesce(pm."ProductName","ExternalProductName"), "ExternalProductName", 'CN', 'brand', 'product'
 from "AreaMarketCycleData" amcd
 left join "ProductMapping" pm on amcd."ExternalProductID" = pm."IMS_ProductID" 
 where nullif(amcd."ExternalProductName",'') is not null and not exists (select 1 from bi_scope_lookup bsl where bsl.type = 'product' and upper(bsl.range_local_name) = upper(amcd."ExternalProductName"))
-group by amcd."ExternalProductName",pm."ProductName"; --97
+group by amcd."ExternalProductName",pm."ProductName"; --133
 insert into bi_scope_lookup
 select gen_random_uuid() as id, NOW() as created_at, NOW() as updated_at, null as deleted_at, max("ExternalProductID"), coalesce(pm."ProductName","ExternalProductName"), "ExternalProductName", 'CN', 'brand', 'product'
 from "InsMarketCycleData" imcd
 left join "ProductMapping" pm on imcd."ExternalProductID" = pm."CPA_ProductID" 
 where nullif(imcd."ExternalProductName",'') is not null and not exists (select 1 from bi_scope_lookup bsl where bsl.type = 'product' and upper(bsl.range_local_name) = upper(imcd."ExternalProductName"))
-group by imcd."ExternalProductName",pm."ProductName"; --74
+group by imcd."ExternalProductName",pm."ProductName"; --119
 insert into bi_scope_lookup
 select gen_random_uuid() as id, NOW() as created_at, NOW() as updated_at, null as deleted_at, min(p."BrandID"), p."BrandName", p."BrandName", 'CN', 'product_cluster', 'product'
-from "Product" p join "InsTrtyProductCycleData" itpcd on itpcd."ProductID" = p."ProductID"
+from "Product" p --join "InsTrtyProductCycleData" itpcd on itpcd."ProductID" = p."ProductID"
 where nullif(p."BrandName",'') is not null and not exists (select 1 from bi_scope_lookup bsl where bsl.level = 'product_cluster' and upper(bsl.range_local_name) = upper(p."BrandName"))
-group by p."BrandName"; --26
+group by p."BrandName"; --76
 insert into bi_scope_lookup
 select gen_random_uuid() as id, NOW() as created_at, NOW() as updated_at, null as deleted_at, min(p."BrandID"), p."BrandName", p."BrandName_EN", 'CN', 'product_cluster', 'product'
-from "Product" p join "InsTrtyProductCycleData" itpcd on itpcd."ProductID" = p."ProductID"
+from "Product" p --join "InsTrtyProductCycleData" itpcd on itpcd."ProductID" = p."ProductID"
 where nullif(p."BrandName_EN",'') is not null and not exists (select 1 from bi_scope_lookup bsl where bsl.level = 'product_cluster' and upper(bsl.range_local_name) = upper(p."BrandName_EN"))
-group by p."BrandName", p."BrandName_EN"; --26
+group by p."BrandName", p."BrandName_EN"; --75
 insert into bi_scope_lookup
 select gen_random_uuid() as id, NOW() as created_at, NOW() as updated_at, null as deleted_at, max("ExternalProductID"), coalesce(pm."ProductName","ExternalProductName"), "ExternalProductName", 'CN', 'product_cluster', 'product'
 from "AreaMarketCycleData" amcd
 left join "ProductMapping" pm on amcd."ExternalProductID" = pm."IMS_ProductID" 
 where nullif(amcd."ExternalProductName",'') is not null and not exists (select 1 from bi_scope_lookup bsl where bsl.level = 'product_cluster' and upper(bsl.range_local_name) = upper(amcd."ExternalProductName"))
-group by amcd."ExternalProductName",pm."ProductName"; --97
+group by amcd."ExternalProductName",pm."ProductName"; --133
 insert into bi_scope_lookup
 select gen_random_uuid() as id, NOW() as created_at, NOW() as updated_at, null as deleted_at, max("ExternalProductID"), coalesce(pm."ProductName","ExternalProductName"), "ExternalProductName", 'CN', 'product_cluster', 'product'
 from "InsMarketCycleData" imcd
 left join "ProductMapping" pm on imcd."ExternalProductID" = pm."CPA_ProductID" 
 where nullif(imcd."ExternalProductName",'') is not null and not exists (select 1 from bi_scope_lookup bsl where bsl.level = 'product_cluster' and upper(bsl.range_local_name) = upper(imcd."ExternalProductName"))
-group by imcd."ExternalProductName",pm."ProductName"; --74
---        sku
+group by imcd."ExternalProductName",pm."ProductName"; --119
+--sku
 insert into bi_scope_lookup
 select gen_random_uuid() as id, NOW() as created_at, NOW() as updated_at, null as deleted_at, max(p."ProductID"), p."ProductName_EN", p."ProductName", 'CN', 'sku', 'product'
-from "Product" p join "InsTrtyProductCycleData" itpcd on itpcd."ProductID" = p."ProductID"
+from "Product" p --join "InsTrtyProductCycleData" itpcd on itpcd."ProductID" = p."ProductID"
 where nullif(p."ProductName",'') is not null and not exists (select 1 from bi_scope_lookup bsl where bsl.type = 'product' and upper(bsl.range_local_name) = upper(p."ProductName"))
-group by p."ProductName", p."ProductName_EN"; --67
+group by p."ProductName", p."ProductName_EN"; --83
 insert into bi_scope_lookup
 select gen_random_uuid() as id, NOW() as created_at, NOW() as updated_at, null as deleted_at, max(p."ProductID"), p."ProductName_EN", p."ProductName", 'CN', 'product_cluster', 'product'
-from "Product" p join "InsTrtyProductCycleData" itpcd on itpcd."ProductID" = p."ProductID"
+from "Product" p --join "InsTrtyProductCycleData" itpcd on itpcd."ProductID" = p."ProductID"
 where nullif(p."ProductName",'') is not null and not exists (select 1 from bi_scope_lookup bsl where bsl.level = 'product_cluster' and upper(bsl.range_local_name) = upper(p."ProductName"))
-group by p."ProductName", p."ProductName_EN"; --67
+group by p."ProductName", p."ProductName_EN"; --83
 insert into bi_scope_lookup
 select gen_random_uuid() as id, NOW() as created_at, NOW() as updated_at, null as deleted_at, max(p."ProductID"), p."ProductName_EN", p."ProductName_EN", 'CN', 'sku', 'product'
-from "Product" p join "InsTrtyProductCycleData" itpcd on itpcd."ProductID" = p."ProductID"
+from "Product" p --join "InsTrtyProductCycleData" itpcd on itpcd."ProductID" = p."ProductID"
 where nullif(p."ProductName_EN",'') is not null and not exists (select 1 from bi_scope_lookup bsl where bsl.type = 'product' and upper(bsl.range_local_name) = upper(p."ProductName_EN"))
-group by p."ProductName_EN"; --67
+group by p."ProductName_EN"; --81
 insert into bi_scope_lookup
 select gen_random_uuid() as id, NOW() as created_at, NOW() as updated_at, null as deleted_at, max(p."ProductID"), p."ProductName_EN", p."ProductName_EN", 'CN', 'product_cluster', 'product'
-from "Product" p join "InsTrtyProductCycleData" itpcd on itpcd."ProductID" = p."ProductID"
+from "Product" p --join "InsTrtyProductCycleData" itpcd on itpcd."ProductID" = p."ProductID"
 where nullif(p."ProductName_EN",'') is not null and not exists (select 1 from bi_scope_lookup bsl where bsl.level = 'product_cluster' and upper(bsl.range_local_name) = upper(p."ProductName_EN"))
-group by p."ProductName_EN"; --67
+group by p."ProductName_EN"; --81
 insert into bi_scope_lookup
 select gen_random_uuid() as id, NOW() as created_at, NOW() as updated_at, null as deleted_at, max(p."ProductID"), p."ProductName_EN", replace(p."ProductName", p."BrandName", p."BrandName_EN"), 'CN', 'sku', 'product'
-from "Product" p join "InsTrtyProductCycleData" itpcd on itpcd."ProductID" = p."ProductID"
-where nullif(p."ProductName",'') is not null and exists (select 1 from bi_scope_lookup bsl where bsl.type = 'product' and upper(bsl.range_local_name) = upper(replace(p."ProductName", p."BrandName", p."BrandName_EN")))
-group by p."ProductName", p."ProductName_EN", p."BrandName", p."BrandName_EN"; --48
+from "Product" p --join "InsTrtyProductCycleData" itpcd on itpcd."ProductID" = p."ProductID"
+where nullif(p."ProductName",'') is not null and not exists (select 1 from bi_scope_lookup bsl where bsl.type = 'product' and upper(bsl.range_local_name) = upper(replace(p."ProductName", p."BrandName", p."BrandName_EN")))
+group by p."ProductName", p."ProductName_EN", p."BrandName", p."BrandName_EN"; --67
 insert into bi_scope_lookup
 select gen_random_uuid() as id, NOW() as created_at, NOW() as updated_at, null as deleted_at, max(p."ProductID"), p."ProductName_EN", replace(p."ProductName", p."BrandName", p."BrandName_EN"), 'CN', 'product_cluster', 'product'
-from "Product" p join "InsTrtyProductCycleData" itpcd on itpcd."ProductID" = p."ProductID"
+from "Product" p --join "InsTrtyProductCycleData" itpcd on itpcd."ProductID" = p."ProductID"
 where nullif(p."ProductName",'') is not null and not exists (select 1 from bi_scope_lookup bsl where bsl.level = 'product_cluster' and upper(bsl.range_local_name) = upper(replace(p."ProductName", p."BrandName", p."BrandName_EN")))
-group by p."ProductName", p."ProductName_EN", p."BrandName", p."BrandName_EN"; --48
+group by p."ProductName", p."ProductName_EN", p."BrandName", p."BrandName_EN"; --67
 insert into bi_scope_lookup
 select gen_random_uuid() as id, NOW() as created_at, NOW() as updated_at, null as deleted_at, max(p."ProductID"), p."ProductName_EN", replace(p."ProductName_EN", p."BrandName_EN", p."BrandName"), 'CN', 'sku', 'product'
-from "Product" p join "InsTrtyProductCycleData" itpcd on itpcd."ProductID" = p."ProductID"
+from "Product" p --join "InsTrtyProductCycleData" itpcd on itpcd."ProductID" = p."ProductID"
 where nullif(p."ProductName",'') is not null and not exists (select 1 from bi_scope_lookup bsl where bsl.type = 'product' and upper(bsl.range_local_name) = upper(replace(p."ProductName_EN", p."BrandName_EN", p."BrandName")))
-group by p."ProductName", p."ProductName_EN", p."BrandName", p."BrandName_EN"; --40
+group by p."ProductName", p."ProductName_EN", p."BrandName", p."BrandName_EN"; --77
 insert into bi_scope_lookup
 select gen_random_uuid() as id, NOW() as created_at, NOW() as updated_at, null as deleted_at, max(p."ProductID"), p."ProductName_EN", replace(p."ProductName_EN", p."BrandName_EN", p."BrandName"), 'CN', 'product_cluster', 'product'
-from "Product" p join "InsTrtyProductCycleData" itpcd on itpcd."ProductID" = p."ProductID"
+from "Product" p --join "InsTrtyProductCycleData" itpcd on itpcd."ProductID" = p."ProductID"
 where nullif(p."ProductName",'') is not null and not exists (select 1 from bi_scope_lookup bsl where bsl.level = 'product_cluster' and upper(bsl.range_local_name) = upper(replace(p."ProductName_EN", p."BrandName_EN", p."BrandName")))
-group by p."ProductName", p."ProductName_EN", p."BrandName", p."BrandName_EN"; --40
---product_lifecycle
+group by p."ProductName", p."ProductName_EN", p."BrandName", p."BrandName_EN"; --77
+
+--brand_lifecycle
 insert into bi_scope_lookup
-select gen_random_uuid() as id, NOW() as created_at, NOW() as updated_at, null as deleted_at, p."ProductFeature", p."ProductFeature", p."ProductFeature", 'CN', 'product_lifecycle', 'product'
+select gen_random_uuid() as id, NOW() as created_at, NOW() as updated_at, null as deleted_at, p."ProductFeature", p."ProductFeature", p."ProductFeature", 'CN', 'brand_lifecycle', 'product'
 from "Product" p join "InsTrtyProductCycleData" itpcd on itpcd."ProductID" = p."ProductID"
 where nullif(p."ProductFeature",'') is not null and not exists (select 1 from bi_scope_lookup bsl where bsl.type = 'product' and upper(bsl.range_local_name) = upper(p."ProductFeature"))
-group by p."ProductFeature"; --4
+group by p."ProductFeature"; --3
 insert into bi_scope_lookup
 select gen_random_uuid() as id, NOW() as created_at, NOW() as updated_at, null as deleted_at, p."ProductFeature", p."ProductFeature", p."ProductFeature", 'CN', 'product_cluster', 'product'
 from "Product" p join "InsTrtyProductCycleData" itpcd on itpcd."ProductID" = p."ProductID"
 where nullif(p."ProductFeature",'') is not null and not exists (select 1 from bi_scope_lookup bsl where bsl.level = 'product_cluster' and upper(bsl.range_local_name) = upper(p."ProductFeature"))
-group by p."ProductFeature"; --4
+group by p."ProductFeature"; --3
+--brand_group
+insert into bi_scope_lookup
+select gen_random_uuid() as id, NOW() as created_at, NOW() as updated_at, null as deleted_at,  tpp."TrtyProdProperty1",  tpp."TrtyProdProperty1",  tpp."TrtyProdProperty1", 'CN', 'brand_group', 'product'
+from "TrtyProdProperty" tpp
+where nullif(tpp."TrtyProdProperty1",'') is not null and not exists (select 1 from bi_scope_lookup bsl where bsl.type = 'product' and upper(bsl.range_local_name) = upper(tpp."TrtyProdProperty1"))
+group by tpp."TrtyProdProperty1"; --6
+insert into bi_scope_lookup
+select gen_random_uuid() as id, NOW() as created_at, NOW() as updated_at, null as deleted_at,  tpp."TrtyProdProperty1",  tpp."TrtyProdProperty1",  tpp."TrtyProdProperty1", 'CN', 'product_cluster', 'product'
+from "TrtyProdProperty" tpp
+where nullif(tpp."TrtyProdProperty1",'') is not null and not exists (select 1 from bi_scope_lookup bsl where bsl.level = 'product_cluster' and upper(bsl.range_local_name) = upper(tpp."TrtyProdProperty1"))
+group by tpp."TrtyProdProperty1"; --6
 
---        is_internal_product
+--is_internal_product
 insert into bi_scope_lookup (id,created_at,updated_at,deleted_at,range_external_id,range_standard_name,range_local_name,local_language,"level","type") values 
          (gen_random_uuid(),NOW(),NOW(),NULL,'false','false','外部产品','CN','is_internal_product','product'),
          (gen_random_uuid(),NOW(),NOW(),NULL,'false','false','竞品','CN','is_internal_product','product'),
          (gen_random_uuid(),NOW(),NOW(),NULL,'true','true','内部产品','CN','is_internal_product','product'),
          (gen_random_uuid(),NOW(),NOW(),NULL,'true','true','Novartis','CN','is_internal_product','product'),
          (gen_random_uuid(),NOW(),NOW(),NULL,'true','true','诺华产品','CN','is_internal_product','product'); --5        
---        product_market
+--product_market
 insert into bi_scope_lookup
 select gen_random_uuid() as id, NOW() as created_at, NOW() as updated_at, null as deleted_at, lower(p."PrimaryMarket"), p."PrimaryMarket", p."PrimaryMarket", 'CN', 'product_market', 'product'
 from "Product" p join "InsTrtyProductCycleData" itpcd on itpcd."ProductID" = p."ProductID"
 where nullif(p."PrimaryMarket",'') is not null and not exists (select 1 from bi_scope_lookup bsl where bsl.level = 'product_market' and upper(bsl.range_local_name) = upper(p."PrimaryMarket"))
-group by p."PrimaryMarket"; --12
+group by p."PrimaryMarket"; --21
 insert into bi_scope_lookup
 select gen_random_uuid() as id, NOW() as created_at, NOW() as updated_at, null as deleted_at, lower(p."PrimaryMarket"), p."PrimaryMarket", max(p."ProductLevel4")||'市场', 'CN', 'product_market', 'product'
 from "Product" p join "InsTrtyProductCycleData" itpcd on itpcd."ProductID" = p."ProductID"
 where nullif(p."PrimaryMarket",'') is not null and not exists (select 1 from bi_scope_lookup bsl where bsl.level = 'product_market' and upper(bsl.range_local_name) = upper(p."ProductLevel4"||'市场'))
-group by p."PrimaryMarket"; --12
+group by p."PrimaryMarket"; --21
 insert into bi_scope_lookup
 select gen_random_uuid() as id, NOW() as created_at, NOW() as updated_at, null as deleted_at, lower(p."PrimaryMarket"), p."PrimaryMarket", max(p."ProductLevel4_EN")||' Market', 'CN', 'product_market', 'product'
 from "Product" p join "InsTrtyProductCycleData" itpcd on itpcd."ProductID" = p."ProductID"
 where nullif(p."PrimaryMarket",'') is not null and not exists (select 1 from bi_scope_lookup bsl where bsl.level = 'product_market' and upper(bsl.range_local_name) = upper(p."ProductLevel4_EN"||' Market'))
-group by p."PrimaryMarket"; --12
+group by p."PrimaryMarket"; --21
 insert into bi_scope_lookup
 select gen_random_uuid() as id, NOW() as created_at, NOW() as updated_at, null as deleted_at, lower(p."PrimaryMarket"), p."PrimaryMarket", max(p."ProductLevel4_EN")||'市场', 'CN', 'product_market', 'product'
 from "Product" p join "InsTrtyProductCycleData" itpcd on itpcd."ProductID" = p."ProductID"
 where nullif(p."PrimaryMarket",'') is not null and not exists (select 1 from bi_scope_lookup bsl where bsl.level = 'product_market' and upper(bsl.range_local_name) = upper(p."ProductLevel4_EN"||' Market'))
-group by p."PrimaryMarket"; --12
+group by p."PrimaryMarket"; --5
 insert into bi_scope_lookup
 select gen_random_uuid() as id, NOW() as created_at, NOW() as updated_at, null as deleted_at, lower("MarketName"), "MarketName", "MarketName", 'CN', 'product_market', 'product'
 from "AreaMarketCycleData" amcd
 where nullif("MarketName",'') is not null and not exists (select 1 from bi_scope_lookup bsl where bsl.level = 'product_market' and upper(bsl.range_local_name) = upper("MarketName"))
-group by "MarketName"; --0
+group by "MarketName"; --6
 insert into bi_scope_lookup
 select gen_random_uuid() as id, NOW() as created_at, NOW() as updated_at, null as deleted_at, lower("MarketName"), "MarketName", "MarketName", 'CN', 'product_market', 'product'
 from "InsMarketCycleData" imcd
 where nullif("MarketName",'') is not null and not exists (select 1 from bi_scope_lookup bsl where bsl.level = 'product_market' and upper(bsl.range_local_name) = upper("MarketName"))
-group by "MarketName"; --0
+group by "MarketName"; --5
+
 
 -- 4.2 keep product aliases in old DBV records
 insert into bi_scope_lookup
@@ -502,7 +520,8 @@ select min(bsla.id::text)::uuid as id, min(bsla.created_at) as created_at, now()
 join bi_scope_lookup bsl1 on bsla."level" = bsl1."level" and bsla."type" = bsl1."type" and bsla.range_standard_name = bsl1.range_standard_name
 where bsla.type = 'product'
 and not exists (select 1 from bi_scope_lookup bsl where bsla."level" = bsl."level" and bsla."type" = bsl."type" and upper(bsla.range_local_name) = upper(bsl.range_local_name) )
-group by bsla.range_standard_name, bsla.range_local_name, bsla."level", bsla."type"; --2448
+and bsla.range_standard_name <> '其他'
+group by bsla.range_standard_name, bsla.range_local_name, bsla."level", bsla."type"; --280
 
 RAISE NOTICE 'Build bi_scope_lookup Step4 - Product done';
 
@@ -651,8 +670,8 @@ RAISE NOTICE 'Step5 SKU to Market done';
 
 -- 6) Market to Market
 INSERT INTO bi_scope_affiliation (id, created_at, updated_at, deleted_at, scope1_type, scope1_level, scope1_range_std_name, scope2_type, scope2_level, scope2_range_std_name, relation) 
-select gen_random_uuid() as id, NOW() as created_at, NOW() as updated_at, null as deleted_at, 'product', 'product_market', 'CRM - HLP MKT', 'product', 'product_market', 'LEQVIO INJ GLOBAL MKT','cascade' 
-where not exists (select 1 from bi_scope_affiliation where scope1_level='product_market' and scope2_level='product_market' and scope1_range_std_name = 'CRM - HLP MKT' and scope2_range_std_name = 'LEQVIO INJ GLOBAL MKT'); --1
+select gen_random_uuid() as id, NOW() as created_at, NOW() as updated_at, null as deleted_at, 'product', 'product_market', 'CRM - HLP MKT', 'product', 'product_market', 'CRM - LEQVIO INJ MKT','cascade' 
+where not exists (select 1 from bi_scope_affiliation where scope1_level='product_market' and scope2_level='product_market' and scope1_range_std_name = 'CRM - HLP MKT' and scope2_range_std_name = 'CRM - LEQVIO INJ MKT'); --1
 
 RAISE NOTICE 'Build bi_scope_affiliation done';
 
