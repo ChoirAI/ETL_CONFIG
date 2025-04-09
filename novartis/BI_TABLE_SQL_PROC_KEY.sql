@@ -172,6 +172,15 @@ insert into bi_scope_lookup
 select gen_random_uuid() as id, now() as created_at, now() as updated_at, null as deleted_at, "InsProdProperty1" as range_external_id, "InsProdProperty1" as range_standard_name, "InsProdProperty1"  as range_local_name, 'CN' as local_language, 'institution_product_segment' as "level", 'institution' as "type" from "InsProdProperty" ipp
 where nullif("InsProdProperty1",'') is not null and not exists (select 1 from bi_scope_lookup bsl where bsl.level = 'institution_product_segment' and upper(bsl.range_local_name) = upper(ipp."InsProdProperty1"))
 group by ipp."InsProdProperty1"; --3
+--institution_product_type
+insert into bi_scope_lookup
+select gen_random_uuid() as id, now() as created_at, now() as updated_at, null as deleted_at, "InsProdProperty2" as range_external_id, "InsProdProperty2" as range_standard_name, "InsProdProperty2"  as range_local_name, 'CN' as local_language, 'institution_product_type' as "level", 'institution' as "type" from "InsProdProperty" ipp
+where nullif("InsProdProperty2",'') is not null and not exists (select 1 from bi_scope_lookup bsl where bsl.level = 'institution_product_type' and upper(bsl.range_local_name) = upper(ipp."InsProdProperty2"))
+group by ipp."InsProdProperty2"; --20
+insert into bi_scope_lookup select gen_random_uuid() as id, now() as created_at, now() as updated_at, null as deleted_at, "InsProdProperty2" as range_external_id, "InsProdProperty2" as range_standard_name, "InsProdProperty2"||'眼科' as range_local_name, 'CN' as local_language, 'institution_product_type' as "level", 'institution' as "type" from "InsProdProperty" ipp
+where nullif("InsProdProperty2",'') is not null and not exists (select 1 from bi_scope_lookup bsl where bsl.level = 'institution_product_type' and upper(bsl.range_local_name) = upper("InsProdProperty2"||'眼科'))
+and ipp."ProductName" = '诺适得' and ipp."InsProdProperty2" not like '%医院'
+group by ipp."InsProdProperty2"; --7 眼科医院
 --sales_channel
 insert into bi_scope_lookup
 select gen_random_uuid() as id, now() as created_at, now() as updated_at, null as deleted_at, "SubInsType" as range_external_id, "SubInsType" as range_standard_name, "SubInsType"  as range_local_name, 'CN' as local_language, 'sales_channel' as "level", 'institution' as "type" from "InsTrtyProductChannelCycleData" itpccd
@@ -513,7 +522,6 @@ from "InsMarketCycleData" imcd
 where nullif("MarketName",'') is not null and not exists (select 1 from bi_scope_lookup bsl where bsl.level = 'product_market' and upper(bsl.range_local_name) = upper("MarketName"))
 group by "MarketName"; --5
 
-
 -- 4.2 keep product aliases in old DBV records
 insert into bi_scope_lookup
 select min(bsla.id::text)::uuid as id, min(bsla.created_at) as created_at, now() as updated_at, null as deleted_at, min(bsla.range_external_id) as range_external_id, bsla.range_standard_name, bsla.range_local_name, min(bsla.local_language) as local_language, bsla."level", bsla."type" from bi_scope_lookup_arc bsla
@@ -599,7 +607,7 @@ from "InsTrtyProductCycleData" itpcd
 join "OrgCycle" oc on itpcd."RepTerritoryCode" = oc."RepTerritoryID" and oc."Cycle" = (select max("Cycle") from "InsTrtyProductCycleData" where "SalesValue">0)
 join "Product" pm on itpcd."ProductID" = pm."ProductID"
 where pm."PrimaryMarket" in (select distinct "MarketName" from "AreaMarketCycleData" union select distinct "MarketName" from "InsMarketCycleData")
-and pm."PrimaryMarket" not in ('LEQVIO INJ GLOBAL MKT')
+and pm."PrimaryMarket" not in ('CRM - LEQVIO INJ MKT')
 group by oc."BUHTerritoryName", pm."PrimaryMarket";--24
 INSERT INTO bi_scope_affiliation (id, created_at, updated_at, deleted_at, scope1_type, scope1_level, scope1_range_std_name, scope2_type, scope2_level, scope2_range_std_name, relation) 
 select gen_random_uuid() as id, NOW() as created_at, NOW() as updated_at, null as deleted_at, 'org_territory', 'franchise_head', oc."FHTerritoryName", 'product', 'product_market', pm."PrimaryMarket",'cascade' 
@@ -608,7 +616,7 @@ join "OrgCycle" oc on itpcd."RepTerritoryCode" = oc."RepTerritoryID" and oc."Cyc
 join "Product" pm on itpcd."ProductID" = pm."ProductID"
 where not exists (select 1 from bi_scope_affiliation where scope1_range_std_name = oc."FHTerritoryName" and scope2_range_std_name = pm."PrimaryMarket")
 and pm."PrimaryMarket" in (select distinct "MarketName" from "AreaMarketCycleData" union select distinct "MarketName" from "InsMarketCycleData")
-and pm."PrimaryMarket" not in ('LEQVIO INJ GLOBAL MKT')
+and pm."PrimaryMarket" not in ('CRM - LEQVIO INJ MKT')
 group by oc."FHTerritoryName", pm."PrimaryMarket";--16
 INSERT INTO bi_scope_affiliation (id, created_at, updated_at, deleted_at, scope1_type, scope1_level, scope1_range_std_name, scope2_type, scope2_level, scope2_range_std_name, relation) 
 select gen_random_uuid() as id, NOW() as created_at, NOW() as updated_at, null as deleted_at, 'org_territory', 'third_line_manager', oc."TLMTerritoryName", 'product', 'product_market', pm."PrimaryMarket",'cascade' 
@@ -617,7 +625,7 @@ join "OrgCycle" oc on itpcd."RepTerritoryCode" = oc."RepTerritoryID" and oc."Cyc
 join "Product" pm on itpcd."ProductID" = pm."ProductID"
 where not exists (select 1 from bi_scope_affiliation where scope1_range_std_name = oc."TLMTerritoryName" and scope2_range_std_name = pm."PrimaryMarket")
 and pm."PrimaryMarket" in (select distinct "MarketName" from "AreaMarketCycleData" union select distinct "MarketName" from "InsMarketCycleData")
-and pm."PrimaryMarket" not in ('LEQVIO INJ GLOBAL MKT')
+and pm."PrimaryMarket" not in ('CRM - LEQVIO INJ MKT')
 group by oc."TLMTerritoryName", pm."PrimaryMarket";--69
 INSERT INTO bi_scope_affiliation (id, created_at, updated_at, deleted_at, scope1_type, scope1_level, scope1_range_std_name, scope2_type, scope2_level, scope2_range_std_name, relation) 
 select gen_random_uuid() as id, NOW() as created_at, NOW() as updated_at, null as deleted_at, 'org_territory', 'second_line_manager', oc."SLMTerritoryName", 'product', 'product_market', pm."PrimaryMarket",'cascade'
@@ -626,7 +634,7 @@ join "OrgCycle" oc on itpcd."RepTerritoryCode" = oc."RepTerritoryID" and oc."Cyc
 join "Product" pm on itpcd."ProductID" = pm."ProductID"
 where not exists (select 1 from bi_scope_affiliation where scope1_range_std_name = oc."SLMTerritoryName" and scope2_range_std_name = pm."PrimaryMarket")
 and pm."PrimaryMarket" in (select distinct "MarketName" from "AreaMarketCycleData" union select distinct "MarketName" from "InsMarketCycleData")
-and pm."PrimaryMarket" not in ('LEQVIO INJ GLOBAL MKT')
+and pm."PrimaryMarket" not in ('CRM - LEQVIO INJ MKT')
 group by oc."SLMTerritoryName", pm."PrimaryMarket";--307
 INSERT INTO bi_scope_affiliation (id, created_at, updated_at, deleted_at, scope1_type, scope1_level, scope1_range_std_name, scope2_type, scope2_level, scope2_range_std_name, relation) 
 select gen_random_uuid() as id, NOW() as created_at, NOW() as updated_at, null as deleted_at, 'org_territory', 'first_line_manager', oc."FLMTerritoryName", 'product', 'product_market', pm."PrimaryMarket",'cascade' 
@@ -635,7 +643,7 @@ join "OrgCycle" oc on itpcd."RepTerritoryCode" = oc."RepTerritoryID" and oc."Cyc
 join "Product" pm on itpcd."ProductID" = pm."ProductID"
 where not exists (select 1 from bi_scope_affiliation where scope1_range_std_name = oc."FLMTerritoryName" and scope2_range_std_name = pm."PrimaryMarket")
 and pm."PrimaryMarket" in (select distinct "MarketName" from "AreaMarketCycleData" union select distinct "MarketName" from "InsMarketCycleData")
-and pm."PrimaryMarket" not in ('LEQVIO INJ GLOBAL MKT')
+and pm."PrimaryMarket" not in ('CRM - LEQVIO INJ MKT')
 group by oc."FLMTerritoryName", pm."PrimaryMarket";--2035
 INSERT INTO bi_scope_affiliation (id, created_at, updated_at, deleted_at, scope1_type, scope1_level, scope1_range_std_name, scope2_type, scope2_level, scope2_range_std_name, relation) 
 select gen_random_uuid() as id, NOW() as created_at, NOW() as updated_at, null as deleted_at, 'org_territory', 'rep_territory', oc."RepTerritoryName", 'product', 'product_market', pm."PrimaryMarket",'cascade' 
@@ -644,7 +652,7 @@ join "OrgCycle" oc on itpcd."RepTerritoryCode" = oc."RepTerritoryID" and oc."Cyc
 join "Product" pm on itpcd."ProductID" = pm."ProductID"
 where not exists (select 1 from bi_scope_affiliation where scope1_range_std_name = oc."RepTerritoryName" and scope2_range_std_name = pm."PrimaryMarket")
 and pm."PrimaryMarket" in (select distinct "MarketName" from "AreaMarketCycleData" union select distinct "MarketName" from "InsMarketCycleData")
-and pm."PrimaryMarket" not in ('LEQVIO INJ GLOBAL MKT')
+and pm."PrimaryMarket" not in ('CRM - LEQVIO INJ MKT')
 group by oc."RepTerritoryName", pm."PrimaryMarket";--15035
 
 RAISE NOTICE 'Step3 Territory to Market done';
