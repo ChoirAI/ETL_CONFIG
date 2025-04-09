@@ -8,7 +8,7 @@ DECLARE
         SELECT DISTINCT TO_DATE("period", 'dd/mm/yyyy') AS period_date
         FROM fact_iqvia_qtr_corp_rnk_2
         WHERE TO_DATE("period", 'dd/mm/yyyy') >= (
-            SELECT TO_DATE(TO_CHAR(MAX(TO_DATE("period", 'dd/mm/yyyy')) - INTERVAL '1 year', 'yyyy'), 'yyyy')
+            SELECT TO_DATE(TO_CHAR(MAX("period") - INTERVAL '1 year', 'yyyy'), 'yyyy')
             FROM fact_iqvia_qtr_corp_rnk_2
         )
         ORDER BY TO_DATE("period", 'dd/mm/yyyy');
