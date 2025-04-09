@@ -220,6 +220,8 @@ CREATE TABLE fact_propel_target_external (
         load_dt date NULL
 );
 
+DELETE FROM fact_propel_sales_external_raw WHERE CAST(SUBSTRING(years FROM 'FY(\d{2})') AS INTEGER) + 2000 < EXTRACT(YEAR FROM CURRENT_DATE) - 3;
+
 -- 1. Standardize column names and column type
 drop table if exists fact_propel_target_external_1;
 create table fact_propel_target_external_1 as
@@ -239,7 +241,8 @@ select
         mtp_ytd::numeric,
         wdind::int,
         load_dt::date
-from fact_propel_sales_external_raw;
+from fact_propel_sales_external_raw
+WHERE CAST(SUBSTRING(years FROM 'FY(\d{2})') AS INTEGER) + 2000 >= EXTRACT(YEAR FROM CURRENT_DATE) - 2; 
 --select type, years, period, product_code, entity_code, count(*) from fact_propel_target_external_1 group by 1,2,3,4,5 having count(*)>1;
 
 RAISE NOTICE 'PROPEL Target Step1 - Standardize columns done';
@@ -548,7 +551,7 @@ update fact_propel_sales_external_2 set mtp_in_vol_ytd =0 where mtp_in_vol_ytd i
 RAISE NOTICE 'PROPEL Sales Step4 - Set null value as 0 done';
 
 -- 5. Drop internal tables
-insert into fact_propel_sales_external select * from fact_propel_sales_external_2;
+insert into fact_propel_sales_external select * from fact_propel_sales_external_2 WHERE CAST(SUBSTRING(years FROM 'FY(\d{2})') AS INTEGER) + 2000 >= EXTRACT(YEAR FROM CURRENT_DATE) - 2;
 drop table fact_propel_sales_external_1;
 alter table fact_propel_sales_external owner to az_user_dw;
 
