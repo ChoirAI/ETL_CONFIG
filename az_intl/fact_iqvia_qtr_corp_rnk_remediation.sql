@@ -5,13 +5,13 @@ DECLARE
     max_year_start DATE;
     current_period DATE;
     period_cursor CURSOR FOR
-        SELECT DISTINCT TO_DATE("period", 'dd/mm/yyyy') AS period_date
+        SELECT DISTINCT "period" AS period_date
         FROM fact_iqvia_qtr_corp_rnk_2
-        WHERE TO_DATE("period", 'dd/mm/yyyy') >= (
+        WHERE "period" >= (
             SELECT TO_DATE(TO_CHAR(MAX("period") - INTERVAL '2 year', 'yyyy'), 'yyyy')
             FROM fact_iqvia_qtr_corp_rnk_2
         )
-        ORDER BY TO_DATE("period", 'dd/mm/yyyy');
+        ORDER BY "period";
 BEGIN
     -- 删除目标表（如果存在）
     DROP TABLE IF EXISTS fact_iqvia_qtr_corp_rnk_3;
@@ -53,7 +53,7 @@ BEGIN
         cal_cte AS (
             SELECT DISTINCT "period", load_dt
             FROM fact_iqvia_qtr_corp_rnk_2
-            WHERE TO_DATE("period", 'dd/mm/yyyy') = current_period
+            WHERE "period" = current_period
         ),
         base_data_cte AS (
             SELECT
@@ -82,7 +82,7 @@ BEGIN
                 ly_us_dollars_actual,
                 ly_units
             FROM fact_iqvia_qtr_corp_rnk_2
-            WHERE TO_DATE("period", 'dd/mm/yyyy') = current_period
+            WHERE "period" = current_period
         )
         SELECT
             base."cluster",
