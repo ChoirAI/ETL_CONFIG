@@ -157,44 +157,43 @@ update dim_product_1 set ex_covid = false where product_code in ('3086', '6002',
 alter table dim_product_1 add column volume_type varchar(20);
 alter table dim_product_1 add column pri_gmd_sub_mkt varchar(50);
 
-update dim_product_1 dp set volume_type = dpa.volume_type 
-from dim_product_arc dpa
-where dp.product_code = dpa.product_code; --413
-drop table if exists public.dim_brand_market_mapping cascade;
-CREATE TABLE public.dim_brand_market_mapping (
+drop table if exists public.dim_brand_mapping cascade;
+CREATE TABLE public.dim_brand_mapping (
         brand_lv4 varchar(50) NULL,
-        pri_gmd_sub_mkt varchar(50) NULL
+        pri_gmd_sub_mkt varchar(50) NULL,
+		volume_type varchar(10) NULL
 );
-INSERT INTO public.dim_brand_market_mapping (brand_lv4, pri_gmd_sub_mkt)
+INSERT INTO public.dim_brand_mapping (brand_lv4, pri_gmd_sub_mkt, volume_type)
 VALUES 
-('Lynparza Family', 'PARP Inhibitors'),
-('Faslodex Family', 'Advanced Breast Cancer'),
-('Airsupra', 'Rescue Respiratory Market'),
-('Nexium Family', 'PPI'),
-('Breztri Family', 'ICS/LAMA/LABA (COPD)'),
-('Losec Family', 'PPI'),
-('Tagrisso', 'EGFR TKI'),
-('Crestor Family', 'Statin'),
-('Zoladex', 'Hormonal LHRH'),
-('Casodex Family', 'Anti Androgens'),
-('Saphnelo Family', 'SLE'),
-('Tezspire Family', 'Severe Asthma'),
-('Symbicort Family', 'ICS/LABA'),
-('Exenatide Family', 'GLP-1'),
-('Calquence', 'BTK inhibitors'),
-('Lokelma', 'Hyperkalaemia'),
-('Brilinta Family', 'Oral Anti-Platelet'),
-('Onglyza Family', 'iOAD - Diabetes'),
-('Seloken/Toprol-XL', 'Beta Blockers'),
-('Forxiga Extended Family', 'iOAD Total'),
-('Imfinzi', 'Immune Checkpoint Inhibitors'),
-('Enhertu Family', 'HER2 Targeted Therapies'),
-('Arimidex Family', 'Hormonal Breast Cancer'),
-('Pulmicort Family', 'Acute Neb Market'),
-('Fasenra Family', 'Severe Asthma');
+('Airsupra', 'Rescue Respiratory Market', 'SU'),
+('Arimidex Family', 'Hormonal Breast Cancer', 'SU'),
+('Breztri Family', 'ICS/LAMA/LABA (COPD)', 'DOT'),
+('Brilinta Family', 'Oral Anti-Platelet', 'DOT'),
+('Calquence', 'BTK inhibitors', 'SU'),
+('Casodex Family', 'Anti Androgens', 'SU'),
+('Crestor Family', 'Statin', 'SU'),
+('Enhertu Family', 'HER2 Targeted Therapies', 'SU'),
+('Exenatide Family', 'GLP-1', 'DOT'),
+('Fasenra Family', 'Severe Asthma', 'DOT'),
+('Faslodex Family', 'Advanced Breast Cancer', 'DOT'),
+('Forxiga Extended Family', 'iOAD Total', 'DOT'),
+('Imfinzi', 'Immune Checkpoint Inhibitors', 'SU'),
+('Lokelma', 'Hyperkalaemia', 'DOT'),
+('Losec Family', 'PPI', 'SU'),
+('Lynparza Family', 'PARP Inhibitors', 'DOT'),
+('Nexium Family', 'PPI', 'SU'),
+('Onglyza Family', 'iOAD - Diabetes', 'DOT'),
+('Pulmicort Family', 'Acute Neb Market', 'SU'),
+('Saphnelo Family', 'SLE', 'DOT'),
+('Seloken/Toprol-XL', 'Beta Blockers', 'SU'),
+('Symbicort Family', 'ICS/LABA', 'DOT'),
+('Synagis Family', NULL, 'SU'),
+('Tagrisso', 'EGFR TKI', 'SU'),
+('Tezspire Family', 'Severe Asthma', 'DOT'),
+('Zoladex', 'Hormonal LHRH', 'DOT');
 
-update dim_product_1 dp set pri_gmd_sub_mkt = m.pri_gmd_sub_mkt 
-from dim_brand_market_mapping m
+update dim_product_1 dp set pri_gmd_sub_mkt = m.pri_gmd_sub_mkt, volume_type = m.volume_type
+from dim_brand_mapping m
 where dp.brand_lv4 = m.brand_lv4; --413
 
 RAISE NOTICE 'Dim Product Step3 - Add columns done';
