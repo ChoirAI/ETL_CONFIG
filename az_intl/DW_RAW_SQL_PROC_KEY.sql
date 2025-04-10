@@ -763,7 +763,7 @@ from fact_iqvia_mth_gmd_ms_3 ly
 left join fact_iqvia_mth_gmd_ms_3 cy on to_date(cy."period",'dd/mm/yyyy') - interval '1 year' = to_date(ly."period",'dd/mm/yyyy') and cy.cluster_ii = ly.cluster_ii and cy.product_key = ly.product_key
 where cy.product_key is null and right(ly."period",4) <> (select max(right("period",4)) from fact_iqvia_mth_gmd_ms_3); --6112
 
-delete from fact_iqvia_mth_gmd_ms_3 where right(period,4)::numeric < (select max(right(period,4))::numeric-1 from fact_iqvia_mth_gmd_ms_3);
+delete from fact_iqvia_mth_gmd_ms_3 where right(period,4)::numeric < (select max(right(period,4))::numeric-2 from fact_iqvia_mth_gmd_ms_3);
 
 RAISE NOTICE 'IQVIA Mth GMD MS Step4 - Add Calculation columns done';
 
@@ -849,7 +849,7 @@ from
         product_key
 from fact_iqvia_mth_gmd_ms_3
 group by product_key) prod
-join (select "period", max(load_dt) as load_dt from fact_iqvia_mth_gmd_ms_3 where to_date(period,'dd/mm/yyyy')>=(select to_date(to_char(max(to_date(period,'dd/mm/yyyy')) - interval '1 year', 'yyyy'), 'yyyy') from fact_iqvia_mth_gmd_ms_3) group by "period") cal on 1=1
+join (select "period", max(load_dt) as load_dt from fact_iqvia_mth_gmd_ms_3 where to_date(period,'dd/mm/yyyy')>=(select to_date(to_char(max(to_date(period,'dd/mm/yyyy')) - interval '2 year', 'yyyy'), 'yyyy') from fact_iqvia_mth_gmd_ms_3) group by "period") cal on 1=1
 join (select distinct "cluster", cluster_i, cluster_ii from fact_iqvia_mth_gmd_ms_3) geo on 1=1
 left join fact_iqvia_mth_class gmd on prod.gmd_sub_mkt = gmd.gmd_sub_mkt and cal."period" = gmd."period" and geo.cluster_ii = gmd.cluster_ii
 left join fact_iqvia_mth_gmd_ms_3 f3 on prod.product_key = f3.product_key and cal."period" = f3."period" and geo.cluster_ii = f3.cluster_ii
@@ -1082,7 +1082,7 @@ from fact_iqvia_qtr_gmd_ms_3 ly
 left join fact_iqvia_qtr_gmd_ms_3 cy on to_date(cy."period",'dd/mm/yyyy') - interval '1 year' = to_date(ly."period",'dd/mm/yyyy') and cy.cluster_ii = ly.cluster_ii and cy.product_key = ly.product_key
 where cy.product_key is null and right(ly."period",4) <> (select max(right("period",4)) from fact_iqvia_qtr_gmd_ms_3); --136517
 
-delete from fact_iqvia_qtr_gmd_ms_3 where right(period,4)::numeric < (select max(right(period,4))::numeric-1 from fact_iqvia_qtr_gmd_ms_3);
+delete from fact_iqvia_qtr_gmd_ms_3 where right(period,4)::numeric < (select max(right(period,4))::numeric-2 from fact_iqvia_qtr_gmd_ms_3);
 
 RAISE NOTICE 'IQVIA Qtr GMD MS Step4 - Add Calculation columns done';
 

@@ -21,7 +21,7 @@ BEGIN
     SELECT * FROM fact_iqvia_qtr_gmd_ms_arc WHERE 1 = 2;
 
     -- 获取最大年份的起始日期
-    SELECT to_date(to_char(max(to_date(period, 'dd/mm/yyyy')) - INTERVAL '1 year', 'yyyy'), 'yyyy')
+    SELECT to_date(to_char(max(to_date(period, 'dd/mm/yyyy')) - INTERVAL '2 year', 'yyyy'), 'yyyy')
     INTO max_year_start
     FROM fact_iqvia_qtr_gmd_ms_3;
 
