@@ -697,9 +697,9 @@ END;
 $procedure$
 ;
 
--- DROP PROCEDURE public.proc_cleanse_bi_source_table_info();
+-- DROP PROCEDURE public.proc_refresh_bi_source_table_info();
 
-CREATE OR REPLACE PROCEDURE public.proc_cleanse_bi_source_table_info()
+CREATE OR REPLACE PROCEDURE public.proc_refresh_bi_source_table_info()
  LANGUAGE plpgsql
 AS $procedure$
 
@@ -715,27 +715,67 @@ create table bi_source_table_info_arc as select * from bi_source_table_info;
 
 RAISE NOTICE 'Backup and re-create bi_source_table_info done';
 
-update bi_source_table_info set last_available_cycle = a.to_period, last_updated_at = now()
-from (select to_char(max(dc."date"),'yyyy/mm') as to_period from fact_propel_sales_external fpse
-join dim_calendar dc on fpse."period" ||', '||fpse.years = dc.month_text_long and dc.day_of_month_num = 1
-where fpse.act > 0) a
-where table_name = 'fact_propel_sales_external';
-update bi_source_table_info set last_available_cycle = a.to_period, last_updated_at = now()
-from (select to_char(max(dc."date"),'yyyy/mm') as to_period from fact_iqvia_mth_gmd_ms f
-join dim_calendar dc on f."period" = dc.date_text1
-where f.us_dollars_actual > 0) a
+update bi_source_table_info 
+set last_available_cycle = a.to_period, 
+    last_updated_at = now()
+from (
+    select 
+        to_char(max(dc."date"), 'yyyy/mm') as to_period
+    from fact_propel_target_external fpte 
+    join dim_calendar dc 
+        on fpte."period" || ', ' || fpte.years = dc.month_text_long 
+        and dc.day_of_month_num = 1
+    where fpte.bud > 0
+) a
+where table_name = 'fact_propel_target_external';
+
+update bi_source_table_info 
+set last_available_cycle = a.to_period, 
+    first_available_cycle = a.from_period, 
+    last_updated_at = now()
+from (
+    select 
+        to_char(max(dc."date"), 'yyyy/mm') as to_period, 
+        to_char(min(dc."date"), 'yyyy/mm') as from_period 
+    from fact_iqvia_mth_gmd_ms f 
+    join dim_calendar dc 
+        on f."period" = dc.date_text1
+    where f.us_dollars_actual > 0
+) a
 where table_name = 'fact_iqvia_mth_gmd_ms';
-update bi_source_table_info set last_available_cycle = a.to_period, last_updated_at = now()
-from (select to_char(max(dc."date"),'yyyy/mm') as to_period from fact_iqvia_qtr_gmd_ms f
-join dim_calendar dc on f."period" = dc.date_text1
-where f.us_dollars_actual > 0) a
+
+update bi_source_table_info 
+set last_available_cycle = a.to_period, 
+    first_available_cycle = a.from_period, 
+    last_updated_at = now()
+from (
+    select 
+        to_char(max(dc."date"), 'yyyy/mm') as to_period, 
+        to_char(min(dc."quarter_start_date"), 'yyyy/mm') as from_period 
+    from fact_iqvia_qtr_gmd_ms f 
+    join dim_calendar dc 
+        on f."period" = dc.date_text1
+    where f.us_dollars_actual > 0
+) a
 where table_name = 'fact_iqvia_qtr_gmd_ms';
-update bi_source_table_info set last_available_cycle = a.to_period, last_updated_at = now()
-from (select to_char(max(dc."date"),'yyyy/mm') as to_period from fact_iqvia_qtr_corp_rnk f
-join dim_calendar dc on f."period" = dc."date"
-where f.us_dollars_actual > 0) a
+
+update bi_source_table_info 
+set last_available_cycle = a.to_period, 
+    first_available_cycle = a.from_period, 
+    last_updated_at = now()
+from (
+    select 
+        to_char(max(dc."date"), 'yyyy/mm') as to_period, 
+        to_char(min(dc."quarter_start_date"), 'yyyy/mm') as from_period 
+    from fact_iqvia_qtr_corp_rnk f 
+    join dim_calendar dc 
+        on f."period" = dc."date"
+    where f.us_dollars_actual > 0
+) a
 where table_name = 'fact_iqvia_qtr_corp_rnk';
-update bi_source_table_info set last_updated_at = now()
+
+update bi_source_table_info 
+set last_updated_at = now()
 where table_name = 'fact_ireal_metric';
 
 RAISE NOTICE 'Refresh bi_source_table_info done';
@@ -743,6 +783,7 @@ RAISE NOTICE 'Refresh bi_source_table_info done';
 END;
 $procedure$
 ;
+
 
 -- DROP PROCEDURE public.proc_cleanse_bi_user_profile();
 
