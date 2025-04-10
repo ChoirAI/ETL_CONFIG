@@ -82,7 +82,7 @@ CREATE OR REPLACE PROCEDURE public.proc_cleanse_dim_product()
  LANGUAGE plpgsql
 AS $procedure$
 BEGIN
-
+        
 
 --=============================================================================================================================
 -- dim_product
@@ -111,7 +111,7 @@ CREATE TABLE public.dim_product (
 
 -- 1. Standardize column names and column type
 drop table if exists dim_product_1;
-create table dim_product_1 as
+create table dim_product_1 as 
 select
         product_code,
         product_description,
@@ -126,10 +126,10 @@ select
 from
         dim_product_raw; --417
 --select product_code, count(*) from dim_product_1 group by 1 having count(*)>1;
-
+        
 RAISE NOTICE 'Dim Product Step1 - Standardize columns done';
 
--- 2. Cleanse column values
+-- 2. Cleanse column values 
 update dim_product_1 set brand_lv2 = replace(brand_lv2, '(Alt 9)', '') where brand_lv2 like '%(Alt 9)%';--413
 update dim_product_1 set brand_lv3 = replace(brand_lv3, '(Alt 9)', '') where brand_lv3 like '%(Alt 9)%';--413
 update dim_product_1 set brand_lv4 = replace(brand_lv4, '(Alt 9)', '') where brand_lv4 like '%(Alt 9)%';--312
@@ -157,12 +157,45 @@ update dim_product_1 set ex_covid = false where product_code in ('3086', '6002',
 alter table dim_product_1 add column volume_type varchar(20);
 alter table dim_product_1 add column pri_gmd_sub_mkt varchar(50);
 
-update dim_product_1 dp set volume_type = dpa.volume_type
+update dim_product_1 dp set volume_type = dpa.volume_type 
 from dim_product_arc dpa
 where dp.product_code = dpa.product_code; --413
-update dim_product_1 dp set pri_gmd_sub_mkt = dpa.pri_gmd_sub_mkt
-from dim_product_arc dpa
-where dp.product_code = dpa.product_code; --413
+drop table if exists public.dim_brand_market_mapping cascade;
+CREATE TABLE public.dim_brand_market_mapping (
+        brand_lv4 varchar(50) NULL,
+        pri_gmd_sub_mkt varchar(50) NULL
+);
+INSERT INTO public.dim_brand_market_mapping (brand_lv4, pri_gmd_sub_mkt)
+VALUES 
+('Lynparza Family', 'PARP Inhibitors'),
+('Faslodex Family', 'Advanced Breast Cancer'),
+('Airsupra', 'Rescue Respiratory Market'),
+('Nexium Family', 'PPI'),
+('Breztri Family', 'ICS/LAMA/LABA (COPD)'),
+('Losec Family', 'PPI'),
+('Tagrisso', 'EGFR TKI'),
+('Crestor Family', 'Statin'),
+('Zoladex', 'Hormonal LHRH'),
+('Casodex Family', 'Anti Androgens'),
+('Saphnelo Family', 'SLE'),
+('Tezspire Family', 'Severe Asthma'),
+('Symbicort Family', 'ICS/LABA'),
+('Exenatide Family', 'GLP-1'),
+('Calquence', 'BTK inhibitors'),
+('Lokelma', 'Hyperkalaemia'),
+('Brilinta Family', 'Oral Anti-Platelet'),
+('Onglyza Family', 'iOAD - Diabetes'),
+('Seloken/Toprol-XL', 'Beta Blockers'),
+('Forxiga Extended Family', 'iOAD Total'),
+('Imfinzi', 'Immune Checkpoint Inhibitors'),
+('Enhertu Family', 'HER2 Targeted Therapies'),
+('Arimidex Family', 'Hormonal Breast Cancer'),
+('Pulmicort Family', 'Acute Neb Market'),
+('Fasenra Family', 'Severe Asthma');
+
+update dim_product_1 dp set pri_gmd_sub_mkt = m.pri_gmd_sub_mkt 
+from dim_brand_market_mapping m
+where dp.brand_lv4 = m.brand_lv4; --413
 
 RAISE NOTICE 'Dim Product Step3 - Add columns done';
 
@@ -177,6 +210,7 @@ RAISE NOTICE 'Dim Product Ready';
 END;
 $procedure$
 ;
+
 
 
 -- DROP PROCEDURE public.proc_cleanse_fact_propel_sales_external();
