@@ -173,7 +173,7 @@ VALUES
 ('Casodex Family', 'Anti Androgens', 'SU'),
 ('Crestor Family', 'Statin', 'SU'),
 ('Enhertu Family', 'HER2 Targeted Therapies', 'SU'),
-('Exenatide Family', 'GLP-1', 'DOT'),
+('Exenatide Family', 'GLP-1 excluding Obesity', 'DOT'),
 ('Fasenra Family', 'Severe Asthma', 'DOT'),
 ('Faslodex Family', 'Advanced Breast Cancer', 'DOT'),
 ('Forxiga Extended Family', 'iOAD Total', 'DOT'),
