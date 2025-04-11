@@ -1,22 +1,31 @@
 [
   {
-    "name": "az_full",
+    "name": "az_iqvia",
     "priority": 1,
+    "tables": [
+      "fact_iqvia_mth_gmd_ms",
+      "fact_iqvia_qtr_gmd_ms",
+      "fact_iqvia_qtr_corp_rnk"
+    ],
+    "tenant": "az_commercial"
+  },
+  {
+    "name": "propel_sales_external",
+    "priority": 2,
     "tables": [
       "dim_geo",
       "dim_product",
-      "fact_propel_sales_external",
-      "fact_iqvia_mth_gmd_ms",
-      "fact_iqvia_qtr_gmd_ms",
-      "fact_iqvia_qtr_corp_rnk",
-      "fact_ireal_mainlist"
-    ]
+      "fact_propel_sales_external"
+    ],
+    "tenant": "az_commercial"
   },
-    {
+  {
     "name": "ireal",
-    "priority": 2,
+    "priority": 3,
     "tables": [
       "fact_ireal_mainlist"
-    ]
+    ],
+    "tenant": "az_commercial",
+    "skip_bi": true
   }
 ]
