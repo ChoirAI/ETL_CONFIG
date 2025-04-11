@@ -44,7 +44,7 @@ values
 ;
 --international
 insert into bi_scope_lookup
-select gen_random_uuid() as id, NOW() as created_at, NOW() as updated_at, NULL, replace(lower(geo_lvl1),' ','_'), geo_lvl1, geo_lvl1, 'EN', 'international', 'geography'
+select gen_random_uuid() as id, NOW() as created_at, NOW() as updated_at, NULL, replace(lower(geo_lvl1),' ','_'), geo_lvl1, geo_lvl1, 'EN', 'region', 'geography'
 from dim_geo dg
 where nullif(geo_lvl1,'') is not null and not exists (select 1 from bi_scope_lookup bsl where bsl.type = 'geography' and bsl.range_standard_name = geo_lvl1 and upper(bsl.range_local_name) = upper(geo_lvl1))
 group by geo_lvl1; --1
@@ -55,7 +55,7 @@ where nullif(geo_lvl1,'') is not null and not exists (select 1 from bi_scope_loo
 group by geo_lvl1; --1
 --region
 insert into bi_scope_lookup
-select gen_random_uuid() as id, NOW() as created_at, NOW() as updated_at, NULL, replace(lower(geo_lvl2),' ','_'), geo_lvl2, geo_lvl2, 'EN', 'region', 'geography'
+select gen_random_uuid() as id, NOW() as created_at, NOW() as updated_at, NULL, replace(lower(geo_lvl2),' ','_'), geo_lvl2, geo_lvl2, 'EN', 'sub_region', 'geography'
 from dim_geo dg
 where nullif(geo_lvl2,'') is not null and not exists (select 1 from bi_scope_lookup bsl where bsl.type = 'geography' and bsl.range_standard_name = geo_lvl2 and upper(bsl.range_local_name) = upper(geo_lvl2))
 group by geo_lvl2; --4
@@ -714,6 +714,22 @@ drop table if exists bi_source_table_info_arc;
 create table bi_source_table_info_arc as select * from bi_source_table_info;
 
 RAISE NOTICE 'Backup and re-create bi_source_table_info done';
+
+update bi_source_table_info 
+set last_available_cycle = a.to_period, 
+    first_available_cycle = a.from_period, 
+    last_updated_at = now()
+from (
+    select 
+        to_char(max(dc."date"), 'yyyy/mm') as to_period, 
+        to_char(min(dc."date"), 'yyyy/mm') as from_period 
+    from fact_propel_sales_external fpse 
+    join dim_calendar dc 
+        on fpse."period" || ', ' || fpse.years = dc.month_text_long 
+        and dc.day_of_month_num = 1
+    where fpse.act > 0
+) a
+where table_name = 'fact_propel_sales_external';
 
 update bi_source_table_info 
 set last_available_cycle = a.to_period, 
