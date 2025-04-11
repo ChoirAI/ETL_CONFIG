@@ -785,9 +785,9 @@ $procedure$
 ;
 
 
--- DROP PROCEDURE public.proc_refresh_bi_user_profile();
+-- DROP PROCEDURE public.proc_cleanse_bi_user_profile();
 
-CREATE OR REPLACE PROCEDURE public.proc_refresh_bi_user_profile()
+CREATE OR REPLACE PROCEDURE public.proc_cleanse_bi_user_profile()
  LANGUAGE plpgsql
 AS $procedure$
 
