@@ -8,7 +8,7 @@
     ],
     "bi_source_table_info": [
       "select * from bi_source_table_info;",
-      "select max(fpse.\"period\" ||', '||fpse.years) from fact_propel_sales_external fpse where act > 0;",
+      "select max(fpse.\"period\" ||', '||fpse.years) from fact_propel_sales_external fpse where act > 0;"
     ],
     "bi_scope_affiliation": [
       "select coalesce(bsa.scope1_type,bsaa.scope1_type) as scope1_type, coalesce(bsa.scope1_level,bsaa.scope1_level) as scope1_level, coalesce(bsa.scope2_level,bsaa.scope2_level) as scope2_level, new_counts, old_counts \nfrom (select scope1_type, scope1_level, scope2_level, count(*) as new_counts from bi_scope_affiliation bsa group by 1,2,3) bsa\nfull outer join (select scope1_type, scope1_level, scope2_level, count(*) as old_counts from bi_scope_affiliation_arc bsaa  group by 1,2,3) bsaa on bsa.scope1_type=bsaa.scope1_type and bsa.scope1_level=bsaa.scope1_level and bsa.scope2_level=bsaa.scope2_level \norder by scope1_type desc, scope1_level;",
