@@ -785,9 +785,9 @@ $procedure$
 ;
 
 
--- DROP PROCEDURE public.proc_cleanse_bi_user_profile();
+-- DROP PROCEDURE public.proc_refresh_bi_user_profile();
 
-CREATE OR REPLACE PROCEDURE public.proc_cleanse_bi_user_profile()
+CREATE OR REPLACE PROCEDURE public.proc_refresh_bi_user_profile()
  LANGUAGE plpgsql
 AS $procedure$
 
@@ -802,77 +802,53 @@ create table bi_user_profile_arc as select * from bi_user_profile;
 
 RAISE NOTICE 'Backup and re-create bi_user_profile done';
 
---drop table if exists dim_user;
---create table dim_user as
---select unique_code, user_name, level as geo_level, unnest(territory) as geo_territory,
---case products when '{"Arimidex Family",Calquence,"Casodex Family","Enhertu Family","Faslodex Family",Imfinzi,Imjudo,"Iressa Family","Lynparza Family","Nolvadex Family",Orpathys,"Other Oncology Brands",Tagrisso,Truqap,Zoladex,"datopotamab deruxtecan Family"}' then 'OBU'
---when '{Airsupra,Andexxa,Beyfortus,"Breztri Family","Brilinta Family","Crestor Family",Evusheld,"Exenatide Family","Fasenra Family","FluMist Family","Forxiga Extended Family",Linzess,Lokelma,"Losec Family","Nexium Family","Onglyza Family","Other CV Established Brands","Other New CVRM Brands","Other R&I  Brands","Other V&I",Others,"Pulmicort Family","Saphnelo Family",Seloken/Toprol-XL,"Seroquel XR/IR","Symbicort Family","Synagis Family","Tezspire Family","V&I TA Non-Brand","Vaxzevria Family","Wainua Family",Zomig,roxadustat,sipavibart}' then 'BBU'
---else 'All' end as bu
---from bi_user_profile; --48
-
-drop table if exists agg_bu_permission;
-create temp table agg_bu_permission as
+drop table if exists agg_ta_permission;
+create temp table agg_ta_permission as 
 select
-        dp.brand_lv2 as bu,
+        dp.brand_lv3 as ta,
         dp.brand_lv4 as products,
         dp.pri_gmd_sub_mkt as markets,
         null as competitor_cpa,
         null as competitor_ims
 from dim_product dp
 where dp.brand_lv4 is not null
-group by dp.brand_lv2, dp.brand_lv4, dp.pri_gmd_sub_mkt
+group by dp.brand_lv3, dp.brand_lv4, dp.pri_gmd_sub_mkt
 union
 select
-        dp.brand_lv2,
+        dp.brand_lv3,
         null as products,
         igp.gmd_sub_mkt as markets,
         null as competitor_cpa,
-        null as competitor_ims
-from iqvia_gmd_product igp
+        null as competitor_ims        
+from iqvia_gmd_product igp 
 left join dim_product_mapping dpm on igp.therapy_area = dpm.product_name and dpm."source" = 'IQVIA' and dpm.brand_lvl = 'brand_lv3'
 left join dim_product dp on dpm.brand_mapping_value = dp.brand_lv3
-group by dp.brand_lv2, igp.gmd_sub_mkt; --99
+group by dp.brand_lv3, igp.gmd_sub_mkt; --99
 
 drop table if exists bi_user_profile_to_refresh;
 create table bi_user_profile_to_refresh as
-select
-        du.unique_code,
-        du.user_name,
-        du.geo_level as level,
-        array_agg(distinct geo_territory)filter(where geo_territory is not null) as territory,
+with bup as 
+(select *, unnest(ta) AS element 
+from bi_user_profile)
+select 
+        bup.unique_code, 
+        bup.user_name, 
+        bup.ta,
         array_agg(distinct abp.products)filter(where abp.products is not null) as products,
         array_agg(distinct abp.markets)filter(where abp.markets is not null) as markets,
         null as competitor_cpa,
         null as competitor_ims
-from dim_user du
-join agg_bu_permission abp on du.bu = abp.bu
-group by du.unique_code, du.user_name, du.geo_level; --5
+from bup
+join agg_ta_permission abp on bup.element = abp.ta
+group by bup.unique_code, bup.user_name, bup.ta; --31
 
-RAISE NOTICE 'Refresh bi_user_profile Step1 - by BU done';
-
-insert into bi_user_profile_to_refresh
-select
-        du.unique_code,
-        du.user_name,
-        du.geo_level as level,
-        array_agg(distinct geo_territory)filter(where geo_territory is not null) as territory,
-        array_agg(distinct abp.products)filter(where abp.products is not null) as products,
-        array_agg(distinct abp.markets)filter(where abp.markets is not null) as markets,
-        null as competitor_cpa,
-        null as competitor_ims
-from dim_user du
-join agg_bu_permission abp on du.bu = 'All'
-group by du.unique_code, du.user_name, du.geo_level; --43
-
-RAISE NOTICE 'Refresh bi_user_profile Step2 - cross BU done';
+RAISE NOTICE 'Refresh bi_user_profile Step1 - by TA done';
 
 update bi_user_profile bup
 set
-        level = tr.level,
-        territory = tr.territory,
-        products = tr.products,
-        markets = tr.markets
-from bi_user_profile_to_refresh tr
+        products = coalesce(tr.products, '{}'),
+        markets = coalesce(tr.markets, '{}')
+from bi_user_profile_to_refresh tr 
 where bup.unique_code = tr.unique_code
 ;
 
